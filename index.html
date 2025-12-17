@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hubstaff Client Log Analyzer</title>
+  <style>
+    :root {
+      --bg: #0f0a1a; --panel: #1a1025; --card: #12081c; --text: #e5e7eb;
+      --muted: #a78bba; --accent: #a855f7; --accent-dim: #7c3aed; --warn: #f59e0b; --danger: #ef4444;
+      --success: #22c55e; --info: #3b82f6; --border: #2d1f3d; --link: #c084fc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header { padding: 20px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, var(--panel) 0%, #1f1030 100%); }
+    header h1 { font-size: 18px; margin-bottom: 4px; color: var(--link); }
+    header p { font-size: 12px; color: var(--muted); }
+
+    main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; overflow: visible; }
+
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+
+    button { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    button:hover { border-color: var(--accent-dim); background: #251535; }
+    button.primary { background: linear-gradient(135deg, var(--accent-dim) 0%, var(--accent) 100%); border-color: var(--accent); }
+    button.primary:hover { opacity: 0.9; }
+
+    textarea { width: 100%; height: 150px; background: #050208; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; resize: vertical; position: relative; z-index: 1; }
+    textarea:focus { outline: none; border-color: var(--accent-dim); }
+
+    .status { font-size: 12px; color: var(--muted); margin-left: 8px; }
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+
+    .toggle-row { display: flex; align-items: center; gap: 16px; margin-top: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+    .toggle-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .toggle-row input[type="checkbox"] { accent-color: var(--accent); }
+    
+    .has-tooltip { position: relative; }
+    .has-tooltip .tooltip { 
+      display: none; 
+      position: absolute; 
+      bottom: calc(100% + 8px); 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: var(--panel); 
+      border: 1px solid var(--accent); 
+      border-radius: 8px; 
+      padding: 10px 12px; 
+      font-size: 11px; 
+      color: var(--text); 
+      width: 260px; 
+      z-index: 1000; 
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      line-height: 1.5;
+      pointer-events: none;
+    }
+    .has-tooltip .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: var(--accent);
+    }
+    .has-tooltip .tooltip.tooltip-bottom {
+      bottom: auto;
+      top: calc(100% + 8px);
+    }
+    .has-tooltip .tooltip.tooltip-bottom::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: var(--accent);
+    }
+    .has-tooltip:hover .tooltip { display: block; }
+    
+    .search-input-wrapper { flex: 1; position: relative; }
+    .search-input-wrapper input { width: 100%; }
+    .search-input-wrapper .tooltip { 
+      width: 280px; 
+      left: 0; 
+      transform: none;
+      text-align: left;
+    }
+    .search-input-wrapper .tooltip code {
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      color: var(--link);
+    }
+    
+    .help-link { color: var(--accent); text-decoration: underline; cursor: pointer; margin-left: auto; }
+
+    .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .filter-btn { padding: 4px 10px; font-size: 11px; border-radius: 20px; }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: linear-gradient(135deg, var(--panel) 0%, #1a1028 100%); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .kpi-label { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+    .kpi-value { font-size: 22px; font-weight: 700; color: var(--link); }
+    .kpi-value.danger { color: var(--danger); }
+    .kpi-value.warn { color: var(--warn); }
+    .kpi-value.success { color: var(--success); }
+
+    .section-title { font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .section-title span { color: var(--accent); }
+
+    .collapsible-section { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; background: var(--card); }
+    .collapsible-header { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between;
+      padding: 12px 16px; 
+      background: var(--panel); 
+      cursor: pointer; 
+      user-select: none;
+      transition: background 0.2s;
+    }
+    .collapsible-header:hover { background: #251535; }
+    .collapsible-header h3 { 
+      font-size: 13px; 
+      font-weight: 600; 
+      color: var(--text); 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      margin: 0;
+    }
+    .collapsible-header h3 span { color: var(--accent); }
+    .collapsible-header .header-meta { display: flex; align-items: center; gap: 12px; }
+    .collapsible-header .badge { 
+      background: var(--accent-dim); 
+      color: #fff; 
+      padding: 2px 8px; 
+      border-radius: 10px; 
+      font-size: 11px; 
+      font-weight: 600;
+    }
+    .collapsible-header .badge.danger { background: var(--danger); }
+    .collapsible-header .badge.warn { background: var(--warn); color: #000; }
+    .collapsible-header .badge.success { background: var(--success); }
+    .collapsible-header .chevron { 
+      color: var(--muted); 
+      transition: transform 0.2s; 
+      font-size: 18px;
+    }
+    .collapsible-header.collapsed .chevron { transform: rotate(-90deg); }
+    .collapsible-content { padding: 16px; }
+    .collapsible-content.collapsed { display: none; }
+
+    .table-wrap { max-height: 400px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--panel); color: var(--muted); font-weight: 600; position: sticky; top: 0; z-index: 10; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: rgba(168,85,247,0.05); }
+
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .tag.error { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .tag.warn { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .tag.info { background: rgba(59,130,246,0.15); color: var(--info); }
+    .tag.success { background: rgba(34,197,94,0.15); color: var(--success); }
+    .tag.audit { background: rgba(168,85,247,0.15); color: var(--accent); }
+    .tag.trace { background: rgba(107,114,128,0.15); color: #9ca3af; }
+    .tag.debug { background: rgba(107,114,128,0.1); color: #6b7280; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .log-line { font-family: monospace; font-size: 11px; line-height: 1.6; word-break: break-all; }
+    .log-line .ts { color: var(--muted); }
+    .log-line .level { font-weight: 600; }
+    .log-line .src { color: var(--accent-dim); }
+    .log-line .msg { color: var(--text); }
+
+    .category-header { background: var(--panel); padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--link); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .category-header:hover { background: #251535; }
+    .category-count { background: var(--accent-dim); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+    .category-content { max-height: 300px; overflow-y: auto; }
+    .category-content.collapsed { display: none; }
+
+    .event-item { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .event-item:last-child { border-bottom: none; }
+    .event-item:hover { background: rgba(168,85,247,0.05); }
+    .event-time { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+    .event-detail { color: var(--text); }
+    .event-context { color: var(--muted); font-size: 10px; margin-top: 4px; font-family: monospace; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; }
+    .modal-overlay.visible { display: flex; }
+    .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; }
+    .modal h2 { color: var(--link); margin-bottom: 16px; font-size: 18px; }
+    .modal h3 { color: var(--accent); margin: 20px 0 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .modal p, .modal li { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 8px; }
+    .modal code { background: var(--card); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: var(--accent); }
+    .close-btn { float: right; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .close-btn:hover { border-color: var(--accent-dim); }
+
+    .filter-stats-box {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: rgba(168,85,247,0.1);
+      border: 1px solid var(--accent-dim);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .filter-stats-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text);
+    }
+    .filter-toggle {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 11px;
+    }
+    .filter-toggle:hover { color: var(--link); }
+    .filter-details {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .filter-details ul {
+      margin: 8px 0 8px 20px;
+    }
+    .filter-details li {
+      margin: 4px 0;
+    }
+    .filter-details code {
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--link);
+      font-size: 10px;
+    }
+
+    .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
+    .search-box input { flex: 1; background: #050208; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 13px; }
+    .search-box input:focus { outline: none; border-color: var(--accent-dim); }
+    .search-box input::placeholder { color: #4a3a5a; }
+
+    .highlight { background: rgba(245,158,11,0.3) !important; }
+
+    .timeline-section { margin-bottom: 16px; }
+    .timeline-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .timeline-legend { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+    .legend-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 3px 8px; border-radius: 4px; transition: all 0.2s; user-select: none; }
+    .legend-toggle:hover { background: rgba(168,85,247,0.1); }
+    .legend-toggle input { accent-color: var(--accent); cursor: pointer; }
+    .legend-toggle.disabled { opacity: 0.4; }
+    .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+
+    .zoom-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; background: var(--panel); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); }
+    .zoom-controls label { font-size: 11px; color: var(--muted); }
+    .zoom-controls input[type=range] { width: 100px; cursor: pointer; accent-color: var(--accent); }
+
+    .timeline-container { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; position: relative; }
+    .timeline-content { position: relative; min-width: 100%; }
+    .timeline-track { position: relative; height: 28px; background: rgba(255,255,255,0.02); border-radius: 4px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.2s; }
+    .timeline-track.hidden { display: none; }
+    .timeline-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; display: flex; justify-content: space-between; transition: all 0.2s; }
+    .timeline-label.hidden { display: none; }
+    .timeline-label .count { color: var(--accent); }
+
+    .t-marker { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; cursor: pointer; transition: transform 0.15s; z-index: 10; }
+    .t-marker:hover { transform: translate(-50%, -50%) scale(1.5); z-index: 20; }
+    .t-marker.error { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+    .t-marker.warn { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+    .t-marker.screenshot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .t-marker.network { background: var(--info); box-shadow: 0 0 6px var(--info); }
+    .t-marker.location { background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .t-marker.tracking { background: var(--link); box-shadow: 0 0 6px var(--link); }
+
+    .timeline-time-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
+
+    .info-box { position: fixed; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 14px; z-index: 1000; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.6); min-width: 220px; max-width: 350px; }
+    .info-box h4 { color: var(--accent); font-size: 13px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .info-box p { font-size: 12px; color: var(--text); margin: 4px 0; line-height: 1.5; }
+    .info-box .label { color: var(--muted); }
+    .info-box .msg { font-family: monospace; font-size: 10px; background: var(--bg); padding: 8px; border-radius: 4px; margin-top: 8px; max-height: 100px; overflow-y: auto; word-break: break-all; }
+
+    .summary-item { padding: 12px; margin-bottom: 10px; border-radius: 8px; border-left: 3px solid var(--border); }
+    .summary-item.critical { background: rgba(239,68,68,0.1); border-left-color: var(--danger); }
+    .summary-item.warning { background: rgba(245,158,11,0.1); border-left-color: var(--warn); }
+    .summary-item.info { background: rgba(168,85,247,0.1); border-left-color: var(--accent); }
+    .summary-item.success { background: rgba(34,197,94,0.1); border-left-color: var(--success); }
+    .summary-item h4 { font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .summary-item p { font-size: 12px; color: var(--muted); margin: 4px 0; line-height: 1.5; }
+    .summary-item .action { font-size: 11px; color: var(--link); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+    .summary-item .tech-detail { font-size: 10px; color: #666; font-family: monospace; margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px; display: none; }
+    .summary-item .tech-detail.visible { display: block; }
+    .summary-item .show-tech { font-size: 10px; color: var(--muted); cursor: pointer; text-decoration: underline; margin-left: 8px; }
+
+    .plain-explanation { font-size: 11px; color: var(--accent); margin-top: 4px; padding: 6px 10px; background: rgba(168,85,247,0.1); border-radius: 4px; border-left: 2px solid var(--accent); }
+
+    .explainer-box {
+      background: rgba(168,85,247,0.1);
+      border: 1px solid var(--accent-dim);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .explainer-box h4 { color: var(--accent); margin: 0 0 8px 0; font-size: 13px; }
+    .explainer-box p { margin: 6px 0; color: var(--text); }
+    .explainer-box .key-point { color: var(--warn); font-weight: 600; }
+    .explainer-box ul { margin: 8px 0 8px 20px; color: var(--muted); }
+    .explainer-box li { margin: 4px 0; }
+
+    .legend-box-inline {
+      background: rgba(0,0,0,0.2);
+      padding: 10px 12px;
+      border-radius: 6px;
+      line-height: 1.8;
+    }
+
+    footer { text-align: center; padding: 20px; border-top: 1px solid var(--border); margin-top: 20px; font-size: 12px; color: var(--muted); }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔮 Hubstaff Client Log Analyzer</h1>
+    <p>Analyze hubstaff.log files to diagnose tracking issues, crashes, network errors, and more.</p>
+    <p style="font-size:11px; color:var(--success); margin-top:4px;">🔒 Privacy: All analysis happens in your browser. No data is sent anywhere.</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="controls">
+        <button class="primary" id="analyzeBtn">🔍 Analyze</button>
+        <button id="clearBtn">Clear</button>
+        <span class="status" id="status"></span>
+      </div>
+      <textarea id="logInput" placeholder="Paste raw hubstaff.log contents here - noise will be filtered automatically..."></textarea>
+      <div class="toggle-row">
+        <label><input type="checkbox" id="autoFilter" checked> Auto-filter noise</label>
+        <label><input type="checkbox" id="plainMode" checked> 🎯 Plain English mode</label>
+        <label class="has-tooltip"><input type="checkbox" id="showDebug"> Show DEBUG level<span class="tooltip">DEBUG logs show detailed app operations like API calls, file reads, and internal processes. Usually only needed for deep technical investigation.</span></label>
+        <label class="has-tooltip"><input type="checkbox" id="showTrace"> Show TRACE level<span class="tooltip">TRACE logs show very granular details like every mouse movement and keystroke. Creates a lot of noise - only enable if specifically needed.</span></label>
+        <span class="help-link" id="helpBtn">Help & Info</span>
+      </div>
+      <div id="filterStats" class="filter-stats-box" style="display:none;">
+        <div class="filter-stats-header">
+          <span id="filterStatsText"></span>
+          <span class="filter-toggle" id="filterDetailsToggle" onclick="toggleFilterDetails()">What was removed?</span>
+        </div>
+        <div id="filterDetails" class="filter-details" style="display:none;">
+          <p><strong>Noise patterns removed:</strong></p>
+          <ul>
+            <li><code>WindowsInput.cpp</code> - Mouse/keyboard coordinates logged every second</li>
+            <li><code>InputExtension.h</code> - Routine input tracking checks</li>
+            <li><code>Heart beat</code> - Keep-alive messages sent regularly</li>
+            <li><code>Response: 200/201/204</code> - Successful API calls (we keep errors)</li>
+            <li><code>Check CURL Response</code> - Routine network checks</li>
+            <li><code>StorageIO.*Wrote</code> - Routine database writes (except Location/TrackedActivity)</li>
+            <li><code>Storage.h.*Read</code> - Routine database reads</li>
+            <li><code>HelperClient.cpp</code> - Routine extension checks (unless contains URL/APP)</li>
+          </ul>
+          <p><strong>Why filter?</strong> These lines appear hundreds/thousands of times and don't help diagnose issues. The "signal" (errors, warnings, screenshots, tracking events) is preserved.</p>
+        </div>
+      </div>
+      <div class="search-box" style="margin-top:12px;">
+        <div class="search-input-wrapper has-tooltip">
+          <input type="text" id="searchInput" placeholder="Search logs (e.g., 'error', 'screenshot', 'URL:')...">
+          <span class="tooltip tooltip-bottom">
+            <strong>🔎 Search Tips:</strong><br><br>
+            Search through ALL log lines (even filtered ones) for specific text.<br><br>
+            <strong>Useful searches:</strong><br>
+            • <code>error</code> - Find all errors<br>
+            • <code>URL:</code> - Find tracked websites<br>
+            • <code>TITLE:</code> - Find window titles<br>
+            • <code>Discard</code> - Find rejected time<br>
+            • <code>screenshot</code> - Find capture events<br>
+            • <code>watchdog</code> - Find freeze events<br>
+            • <code>Response: 5</code> - Find server errors<br><br>
+            <em>Results auto-expand below. Max 200 results shown.</em>
+          </span>
+        </div>
+        <button id="searchBtn">Search</button>
+        <button id="clearSearchBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpiSection">
+      <div class="kpi"><div class="kpi-label">Total Lines</div><div class="kpi-value" id="kpiTotal">0</div></div>
+      <div class="kpi"><div class="kpi-label">Errors</div><div class="kpi-value danger" id="kpiErrors">0</div></div>
+      <div class="kpi"><div class="kpi-label">Warnings</div><div class="kpi-value warn" id="kpiWarnings">0</div></div>
+      <div class="kpi"><div class="kpi-label">Tracked Time</div><div class="kpi-value success" id="kpiTrackedTime">0:00:00</div></div>
+      <div class="kpi"><div class="kpi-label">Idle Kept</div><div class="kpi-value" id="kpiIdleKept">0:00:00</div></div>
+      <div class="kpi"><div class="kpi-label">Idle Discarded</div><div class="kpi-value warn" id="kpiIdleDisc">0:00:00</div></div>
+      <div class="kpi"><div class="kpi-label">Timezone</div><div class="kpi-value" id="kpiTimezone">--</div></div>
+      <div class="kpi"><div class="kpi-label">Log Time Span</div><div class="kpi-value" id="kpiTimeSpan">--</div></div>
+    </div>
+
+    <div class="card" id="summaryCard" style="display:none; border-left: 3px solid var(--accent);">
+      <div class="section-title"><span>📋</span> Quick Summary for Support</div>
+      <div id="summaryContent"></div>
+    </div>
+
+    <div class="collapsible-section" id="sessionsCard" style="display:none;">
+      <div class="collapsible-header" onclick="toggleSection('sessions')">
+        <h3><span>⏱️</span> Tracking Sessions</h3>
+        <div class="header-meta">
+          <span class="badge" id="sessionsCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content" id="sessionsContent">
+        <div id="sessionExplainer" class="explainer-box" style="display:none;"></div>
+        <div class="table-wrap" style="max-height:300px;">
+          <table>
+            <thead><tr><th>#</th><th>Start</th><th>Stop</th><th>Duration</th><th>Stop Reason</th></tr></thead>
+            <tbody id="sessionsBody"></tbody>
+          </table>
+        </div>
+        <div id="stopReasonLegend" class="legend-box-inline" style="margin-top:10px; font-size:11px; color:var(--muted); display:none;">
+          <strong>Stop Reasons:</strong> 
+          <span class="tag success" style="margin-left:8px;">User stopped</span> = Normal stop, logged by app as user-initiated. 
+          <span class="tag warn" style="margin-left:8px;">Went idle</span> = Idle timeout triggered. 
+          <span class="tag error" style="margin-left:8px;">⚠️ Crashed</span> = No stop event found, likely crashed.
+          <span style="margin-left:8px;">⚡ = Very short session (&lt;30s)</span>
+        </div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
+          <div class="section-title" style="margin-bottom:8px;"><span>💤</span> Idle Time Decisions</div>
+          <div class="table-wrap" style="max-height:200px;">
+            <table>
+              <thead><tr><th>Time</th><th>Idle Duration</th><th>Decision</th></tr></thead>
+              <tbody id="idleBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card timeline-section" id="timelineSection" style="display:none;">
+      <div class="timeline-header">
+        <div class="section-title" style="margin:0;"><span>📊</span> Event Timeline</div>
+        <div class="timeline-legend">
+          <label class="legend-toggle"><input type="checkbox" id="togErrors" checked><div class="legend-box" style="background:var(--danger)"></div> Errors</label>
+          <label class="legend-toggle"><input type="checkbox" id="togWarnings" checked><div class="legend-box" style="background:var(--warn)"></div> Warnings</label>
+          <label class="legend-toggle"><input type="checkbox" id="togScreenshots" checked><div class="legend-box" style="background:var(--accent)"></div> Screenshots</label>
+          <label class="legend-toggle"><input type="checkbox" id="togNetwork" checked><div class="legend-box" style="background:var(--info)"></div> Network</label>
+          <label class="legend-toggle"><input type="checkbox" id="togLocation" checked><div class="legend-box" style="background:#10b981"></div> Location</label>
+          <label class="legend-toggle"><input type="checkbox" id="togTracking" checked><div class="legend-box" style="background:var(--link)"></div> Tracking</label>
+        </div>
+        <div class="zoom-controls">
+          <label>Zoom:</label>
+          <input type="range" id="zoomSlider" min="1" max="20" value="1" step="0.5">
+          <button id="resetZoom">Reset</button>
+        </div>
+      </div>
+      <div class="timeline-container" id="timelineContainer">
+        <div class="timeline-content" id="timelineContent">
+          <div class="timeline-label" id="labelErrors">Errors <span class="count" id="tlErrorCount">0</span></div>
+          <div class="timeline-track" id="trackErrors"></div>
+          <div class="timeline-label" id="labelWarnings">Warnings <span class="count" id="tlWarnCount">0</span></div>
+          <div class="timeline-track" id="trackWarnings"></div>
+          <div class="timeline-label" id="labelScreenshots">Screenshots <span class="count" id="tlScreenCount">0</span></div>
+          <div class="timeline-track" id="trackScreenshots"></div>
+          <div class="timeline-label" id="labelNetwork">Network <span class="count" id="tlNetCount">0</span></div>
+          <div class="timeline-track" id="trackNetwork"></div>
+          <div class="timeline-label" id="labelLocation">Location <span class="count" id="tlLocCount">0</span></div>
+          <div class="timeline-track" id="trackLocation"></div>
+          <div class="timeline-label" id="labelTracking">Tracking <span class="count" id="tlTrackCount">0</span></div>
+          <div class="timeline-track" id="trackTracking"></div>
+          <div class="timeline-time-axis" id="timeAxis"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="collapsible-section">
+        <div class="collapsible-header" onclick="toggleSection('errors')">
+          <h3><span>🚨</span> Errors & Critical Issues</h3>
+          <div class="header-meta">
+            <span class="badge danger" id="errorsCount">0</span>
+            <span class="chevron">▼</span>
+          </div>
+        </div>
+        <div class="collapsible-content" id="errorsContent">
+          <div class="category-content" id="errorsList" style="max-height:350px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <div class="collapsible-section">
+        <div class="collapsible-header" onclick="toggleSection('warnings')">
+          <h3><span>⚠️</span> Warnings & Anomalies</h3>
+          <div class="header-meta">
+            <span class="badge warn" id="warningsCount">0</span>
+            <span class="chevron">▼</span>
+          </div>
+        </div>
+        <div class="collapsible-content" id="warningsContent">
+          <div class="category-content" id="warningsList" style="max-height:350px; overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('screenshots')">
+        <h3><span>📸</span> Screenshots & Screen Capture</h3>
+        <div class="header-meta">
+          <span class="badge" id="screenshotsCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="screenshotsContent">
+        <div class="table-wrap" style="max-height:250px;">
+          <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+            <tbody id="screenshotsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('network')">
+        <h3><span>🌐</span> Network & API Activity</h3>
+        <div class="header-meta">
+          <span class="badge" id="networkCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="networkContent">
+        <div class="table-wrap" style="max-height:250px;">
+          <table>
+            <thead><tr><th>Time</th><th>Status</th><th>Details</th></tr></thead>
+            <tbody id="networkBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('locations')">
+        <h3><span>📍</span> Locations & Job Sites</h3>
+        <div class="header-meta">
+          <span class="badge" id="locationsCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="locationsContent">
+        <div class="table-wrap" style="max-height:200px;">
+          <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+            <tbody id="locationsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('apps')">
+        <h3><span>🖥️</span> URLs & Applications</h3>
+        <div class="header-meta">
+          <span class="badge" id="appsCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="appsContent">
+        <div class="table-wrap" style="max-height:250px;">
+          <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Content</th></tr></thead>
+            <tbody id="appsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('injected')">
+        <h3><span>🤖</span> Injected Input Activity</h3>
+        <div class="header-meta">
+          <span class="badge" id="injectedCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="injectedContent">
+        <div id="injectedExplainer" class="explainer-box">
+          <h4>What is "Injected Input"?</h4>
+          <p>Windows can detect when keyboard/mouse input comes from software rather than physical devices:</p>
+          <ul>
+            <li><strong>Real input (R)</strong> - Actual keyboard/mouse from the user</li>
+            <li><strong>Injected input (I)</strong> - Software-generated input from another process</li>
+            <li><strong>Low-integrity injected (LI)</strong> - Input from unverified/untrusted sources</li>
+          </ul>
+          <p><strong>Common legitimate causes:</strong> Remote desktop, accessibility tools, automation software, gaming mice/keyboards with macros, screen sharing.</p>
+          <p><strong>⚠️ Note:</strong> Injected input is NOT automatically cheating. Many legitimate tools inject input. Look for patterns like: consistently 100% activity, same screenshots repeating, or injected input with zero real input.</p>
+        </div>
+        <div class="table-wrap" style="max-height:250px;">
+          <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Details</th></tr></thead>
+            <tbody id="injectedBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('tracking')">
+        <h3><span>📝</span> Raw Tracking Events</h3>
+        <div class="header-meta">
+          <span class="badge" id="trackingCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="trackingContent">
+        <div class="table-wrap" style="max-height:250px;">
+          <table>
+            <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+            <tbody id="trackingBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-section">
+      <div class="collapsible-header collapsed" onclick="toggleSection('search')">
+        <h3><span>🔎</span> Search Results</h3>
+        <div class="header-meta">
+          <span class="badge" id="searchCount">0</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content collapsed" id="searchContent">
+        <div class="table-wrap" style="max-height:300px;">
+          <table>
+            <thead><tr><th>Time</th><th>Level</th><th>Source</th><th>Message</th></tr></thead>
+            <tbody id="searchBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span>Hubstaff Client Log Analyzer</span>
+      <span style="margin:0 10px;">|</span>
+      <span class="help-link" id="privacyBtn">🔒 Privacy Info</span>
+    </footer>
+  </main>
+
+  <div class="modal-overlay" id="privacyModal">
+    <div class="modal" style="max-width:550px;">
+      <button class="close-btn" id="closePrivacy">Close</button>
+      <h2>🔒 Privacy & Data Security</h2>
+      <h3>Your data stays on your device</h3>
+      <p>This tool runs <strong>entirely in your web browser</strong>. When you paste log data:</p>
+      <ul>
+        <li>✅ Data is processed locally on your computer</li>
+        <li>✅ Nothing is sent to any server</li>
+        <li>✅ No data is stored in cookies or browser storage</li>
+        <li>✅ No tracking or analytics</li>
+      </ul>
+      <h3>What happens when you click "Clear"</h3>
+      <ul>
+        <li>The text input is emptied</li>
+        <li>All parsed data is overwritten in memory</li>
+        <li>All displayed results are removed</li>
+        <li>A confirmation message appears</li>
+      </ul>
+      <h3>What happens when you close the page</h3>
+      <ul>
+        <li>All data is automatically cleared</li>
+        <li>Nothing persists after you leave</li>
+        <li>No data remains in browser history</li>
+      </ul>
+      <h3>Best practices</h3>
+      <ul>
+        <li>Click <strong>"Clear"</strong> when you're done analyzing</li>
+        <li>Close the browser tab when finished</li>
+        <li>Avoid sharing screenshots that show email addresses or PII</li>
+      </ul>
+      <div style="background:rgba(34,197,94,0.1); border:1px solid var(--success); border-radius:8px; padding:12px; margin-top:16px;">
+        <p style="margin:0; color:var(--success);"><strong>✅ Safe to use with sensitive logs</strong></p>
+        <p style="margin:8px 0 0 0; font-size:12px;">This tool is designed for support teams handling customer data. Your logs never leave your browser.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box" id="infoBox">
+    <h4 id="infoTitle">Event Details</h4>
+    <div id="infoContent"></div>
+  </div>
+
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal">
+      <button class="close-btn" id="closeHelp">Close</button>
+      <h2>🔮 Client Log Analyzer Help</h2>
+      
+      <h3>What this tool analyzes</h3>
+      <p>This analyzer is designed for <code>hubstaff.log</code> files (the detailed client logs), not audit.log files. It extracts and categorizes:</p>
+      <ul>
+        <li><strong>Errors & Crashes</strong> - [ERROR] level events, watchdog hits, helper crashes</li>
+        <li><strong>Warnings</strong> - [WARN] level events, discarded time, anomalies</li>
+        <li><strong>Screenshots</strong> - Capture events, uploads, failures</li>
+        <li><strong>Network</strong> - API responses, connection issues, sync problems</li>
+        <li><strong>Locations</strong> - Job site events, geofence entries/exits</li>
+        <li><strong>URLs & Apps</strong> - Tracked applications and websites</li>
+        <li><strong>Time Tracking</strong> - Resume, idle, discard events</li>
+      </ul>
+
+      <h3>Built-in Noise Filter</h3>
+      <p>The analyzer has a built-in noise filter (enabled by default). It automatically removes routine log lines that don't help with debugging:</p>
+      <ul>
+        <li><code>WindowsInput.cpp</code> - Mouse/keyboard coordinates</li>
+        <li><code>InputExtension.h</code> - Routine input tracking</li>
+        <li><code>Heart beat</code> - Keep-alive messages</li>
+        <li><code>Response: 200/201/204</code> - Successful API calls</li>
+        <li><code>StorageIO.*Wrote</code> - Routine database writes (unless Location/TrackedActivity)</li>
+        <li><code>Storage.h.*Read</code> - Routine reads</li>
+      </ul>
+      <p>Uncheck "Auto-filter noise" if you need to see all raw log lines.</p>
+
+      <h3>Key things to look for</h3>
+      <ul>
+        <li><code>main_watchdog hit</code> - App is freezing/hanging</li>
+        <li><code>Helper died</code> - Browser extension crashed</li>
+        <li><code>Discard=</code> - Time was rejected</li>
+        <li><code>Response: 4xx/5xx</code> - Server errors</li>
+        <li><code>OS Memory</code> - Low memory warnings</li>
+      </ul>
+
+      <h3>Search tips</h3>
+      <p>Use the search box to find specific patterns:</p>
+      <ul>
+        <li><code>error</code> - Find all error mentions</li>
+        <li><code>URL:</code> - Find tracked URLs</li>
+        <li><code>screenshot</code> - Find screenshot events</li>
+        <li><code>Discard</code> - Find rejected time</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const pad = n => String(n).padStart(2, '0');
+
+    let allLines = [];
+    let parsedData = null;
+    let timelineMin = null;
+    let timelineDur = null;
+    let selectedMarker = null;
+
+    // === NOISE FILTER PATTERNS ===
+    const NOISE_PATTERNS = [
+      /WindowsInput\.cpp/,
+      /InputExtension\.h/,
+      /Heart beat\s*:/i,
+      /Response:\s*200\b/,
+      /Response:\s*201\b/,
+      /Response:\s*204\b/,
+      /Check CURL Response/i,
+      /Storage\.h.*Read/i,
+    ];
+
+    const HELPER_CLIENT_PATTERN = /HelperClient\.cpp/;
+    const HELPER_CLIENT_KEEP = /(URL:|APP:|TITLE:)/i;
+    const STORAGE_IO_WROTE_PATTERN = /StorageIO.*Wrote/i;
+    const STORAGE_IO_KEEP = /(Location|TrackedActivity)/i;
+
+    const SIGNAL_PATTERNS = [
+      /\[ERROR\]/i, /\[WARN\]/i, /\[AUDIT\]/i,
+      /main_watchdog hit/i, /OS Memory/i, /Helper died/i, /Startup/i,
+      /Discard=/i, /\bResume\b/i, /\bIdle\b/i,
+      /Server Error/i, /Possible traffic issue/i,
+      /Response:\s*4\d{2}/, /Response:\s*5\d{2}/,
+      /Uploading Screen/i, /Capture Screen/i, /Wrote ScreenData/i,
+      /feed:\s*sites/i, /LocationFeatureState/i, /LocationManager/i,
+    ];
+
+    const APP_GRABBER_PATTERN = /ApplicationGrabber/i;
+    const APP_GRABBER_KEEP = /(URL:|TITLE:)/i;
+
+    function isSignal(line) {
+      for (const p of SIGNAL_PATTERNS) if (p.test(line)) return true;
+      if (APP_GRABBER_PATTERN.test(line) && APP_GRABBER_KEEP.test(line)) return true;
+      if (HELPER_CLIENT_PATTERN.test(line) && HELPER_CLIENT_KEEP.test(line)) return true;
+      return false;
+    }
+
+    function isNoise(line) {
+      for (const p of NOISE_PATTERNS) if (p.test(line)) return true;
+      if (HELPER_CLIENT_PATTERN.test(line) && !HELPER_CLIENT_KEEP.test(line)) return true;
+      if (STORAGE_IO_WROTE_PATTERN.test(line) && !STORAGE_IO_KEEP.test(line)) return true;
+      return false;
+    }
+
+    function filterLogs(lines) {
+      return lines.filter(line => {
+        if (!line.trim()) return false;
+        if (isSignal(line)) return true;
+        if (isNoise(line)) return false;
+        return true;
+      });
+    }
+
+    function parseTimestamp(line) {
+      const m = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+      if (!m) return null;
+      return new Date(`${m[1]}T${m[2]}`);
+    }
+
+    function parseTimezone(line) {
+      // Check for explicit TZ Offset line (e.g., "TZ Offset  : 05:30:00" or "TZ Offset  : -05:30:00")
+      const tzOffsetMatch = line.match(/TZ Offset\s*:\s*(-?)(\d{2}):(\d{2})/i);
+      if (tzOffsetMatch) {
+        const sign = tzOffsetMatch[1] === '-' ? '-' : '+';
+        return `${sign}${tzOffsetMatch[2]}:${tzOffsetMatch[3]}`;
+      }
+      
+      // Check for timestamp suffix timezone (e.g., "+0530" or "-08:00")
+      const m = line.match(/([+-]\d{2}:?\d{2})\s*$/);
+      if (m) {
+        let tz = m[1];
+        if (!tz.includes(':')) tz = tz.slice(0,3) + ':' + tz.slice(3);
+        return tz;
+      }
+      const m2 = line.match(/\s([+-]\d{4})\s/);
+      if (m2) {
+        const tz = m2[1];
+        return tz.slice(0,3) + ':' + tz.slice(3);
+      }
+      return null;
+    }
+
+    function fmtDuration(secs) {
+      if (!secs || secs < 0) return '0:00:00';
+      secs = Math.floor(secs);
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      return `${h}:${pad(m)}:${pad(s)}`;
+    }
+
+    function parseLevel(line) {
+      if (line.includes('[ERROR]')) return 'ERROR';
+      if (line.includes('[WARN]')) return 'WARN';
+      if (line.includes('[AUDIT]')) return 'AUDIT';
+      if (line.includes('[INFO]')) return 'INFO';
+      if (line.includes('[DEBUG]')) return 'DEBUG';
+      if (line.includes('[TRACE]')) return 'TRACE';
+      return 'UNKNOWN';
+    }
+
+    function parseSource(line) {
+      const m = line.match(/\]\s+(\w+\.\w+:\d+)/);
+      return m ? m[1] : '';
+    }
+
+    function parseMessage(line) {
+      const m = line.match(/\]\s+\w+\.\w+:\d+\s+(.+)$/);
+      return m ? m[1] : line;
+    }
+
+    function fmtTime(date) {
+      if (!date) return '--';
+      return date.toLocaleTimeString();
+    }
+
+    function fmtDate(date) {
+      if (!date) return '--';
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // === PLAIN ENGLISH TRANSLATIONS ===
+    function translateToPlainEnglish(msg, level, src) {
+      const m = msg.toLowerCase();
+      
+      // Watchdog / Freezing
+      if (m.includes('main_watchdog hit')) 
+        return { text: "⚠️ The app froze or became unresponsive", action: "Ask user if app felt slow/frozen. May need to restart the app.", severity: "critical" };
+      
+      // Helper / Extension
+      if (m.includes('helper died') || m.includes('helper crash'))
+        return { text: "🔌 The browser extension crashed", action: "Ask user to reinstall the browser extension and restart their browser.", severity: "critical" };
+      
+      // Memory
+      if (m.includes('os memory') || m.includes('low memory'))
+        return { text: "💾 Computer is running low on memory (RAM)", action: "User may have too many apps open. Suggest closing unused programs.", severity: "warning" };
+      
+      // Screenshots
+      if (m.includes('uploading screen'))
+        return { text: "📸 Screenshot was captured and is uploading", action: null, severity: "info" };
+      if (m.includes('capture screen'))
+        return { text: "📸 Taking a screenshot", action: null, severity: "info" };
+      if (m.includes('screenshot') && (m.includes('fail') || m.includes('error')))
+        return { text: "📸 Screenshot failed to capture or upload", action: "Check user's internet connection and screen capture permissions.", severity: "warning" };
+      
+      // Network errors
+      if (m.includes('response: 401') || m.includes('response: 403'))
+        return { text: "🔐 Authentication failed - user may be logged out", action: "Ask user to log out and log back into Hubstaff.", severity: "critical" };
+      if (m.includes('response: 404'))
+        return { text: "❓ Server couldn't find the requested data", action: "The project or task may have been deleted. Check if it still exists.", severity: "warning" };
+      if (m.includes('response: 500') || m.includes('response: 502') || m.includes('response: 503'))
+        return { text: "🌐 Hubstaff server error occurred", action: "This is a server-side issue. Check status.hubstaff.com for outages.", severity: "critical" };
+      if (m.includes('server error'))
+        return { text: "🌐 Couldn't connect to Hubstaff servers", action: "Check user's internet. If working, check status.hubstaff.com.", severity: "warning" };
+      if (m.includes('traffic issue') || m.includes('network error'))
+        return { text: "🌐 Network connection problem", action: "User may have unstable internet. Ask about WiFi/connection quality.", severity: "warning" };
+      if (m.includes('timeout'))
+        return { text: "⏱️ Request timed out - server took too long", action: "Usually temporary. If persistent, check internet speed.", severity: "warning" };
+      
+      // Time tracking
+      if (m.includes('discard=1') || m.includes('discard=true')) {
+        if (m.includes('locked')) return { text: "🔒 Time rejected - timesheet is locked/approved", action: "Admin has locked this timesheet. Time cannot be added.", severity: "critical" };
+        if (m.includes('future')) return { text: "⏰ Time rejected - computer clock is wrong", action: "User's computer clock is set to the future. Fix system time.", severity: "critical" };
+        if (m.includes('duplicate')) return { text: "📋 Time rejected - already recorded", action: "This time was already uploaded. No action needed.", severity: "info" };
+        return { text: "❌ Tracked time was rejected by the server", action: "Check the specific reason. May need manual time entry.", severity: "critical" };
+      }
+      if (m.includes('resume') && !m.includes('resume_ignored'))
+        return { text: "▶️ Tracking resumed after interruption", action: null, severity: "info" };
+      if (m.includes('idle') && m.includes('wake'))
+        return { text: "💤 User returned from being idle", action: null, severity: "info" };
+      if (m.includes('idle') && !m.includes('wake'))
+        return { text: "💤 User went idle (no activity detected)", action: null, severity: "info" };
+      
+      // Startup
+      if (m.includes('startup') && m.includes('clean'))
+        return { text: "✅ App started normally", action: null, severity: "success" };
+      if (m.includes('startup') && m.includes('unclean'))
+        return { text: "⚠️ App restarted after a crash", action: "Check if time was recovered. Look for RESUME events after this.", severity: "warning" };
+      
+      // Location / Job Sites
+      if (m.includes('locationmanager') || m.includes('locationfeature'))
+        return { text: "📍 Location/Job Site feature activity", action: null, severity: "info" };
+      if (m.includes('geofence') && m.includes('enter'))
+        return { text: "📍 User entered a Job Site location", action: null, severity: "info" };
+      if (m.includes('geofence') && m.includes('exit'))
+        return { text: "📍 User left a Job Site location", action: "If tracking stopped unexpectedly, this may be why.", severity: "info" };
+      if (m.includes('location') && m.includes('denied'))
+        return { text: "📍 Location permission was denied", action: "User needs to enable location permissions for Job Sites to work.", severity: "warning" };
+      
+      // URLs and Apps
+      if (m.includes('url:') && m.includes('title:'))
+        return { text: "🖥️ Recorded active window/website", action: null, severity: "info" };
+      if (m.includes('applicationgrabber'))
+        return { text: "🖥️ Detecting active application", action: null, severity: "info" };
+      
+      // Generic errors/warnings
+      if (level === 'ERROR')
+        return { text: "❌ An error occurred in the app", action: "Review the technical details below for more context.", severity: "critical" };
+      if (level === 'WARN')
+        return { text: "⚠️ Something unexpected happened", action: "Usually not critical, but worth noting if issues persist.", severity: "warning" };
+      
+      return null;
+    }
+
+    function generateSummary(data) {
+      const findings = [];
+      
+      // === TRACKING SUMMARY ===
+      const totalTrackedSecs = data.sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+      const logDurationSecs = (data.endTime - data.startTime) / 1000;
+      
+      if (data.sessions.length > 0) {
+        const crashedSessions = data.sessions.filter(s => s.stopReason === 'CRASHED' || s.stopReason === 'LOG_END');
+        const idleStops = data.sessions.filter(s => s.stopReason === 'IDLE');
+        const resumedStarts = data.sessions.filter(s => s.startReason === 'RESUMED');
+        const userStops = data.sessions.filter(s => s.stopReason === 'USER');
+        
+        let sessionDesc = `Found ${data.sessions.length} tracking session${data.sessions.length > 1 ? 's' : ''} totaling <strong>${fmtDuration(totalTrackedSecs)}</strong>.`;
+        if (resumedStarts.length > 0) sessionDesc += ` ${resumedStarts.length} session(s) were recovered after a crash.`;
+        if (idleStops.length > 0) sessionDesc += ` ${idleStops.length} stopped due to idle timeout.`;
+        
+        findings.push({
+          severity: crashedSessions.length > 0 ? 'warning' : 'info',
+          icon: '⏱️',
+          title: `Tracked Time: ${fmtDuration(totalTrackedSecs)}`,
+          description: sessionDesc,
+          action: crashedSessions.length > 0 ? 'Some sessions may have ended unexpectedly. Check the Sessions table below for details.' : null,
+          techDetail: null
+        });
+        
+        // === LOG DURATION VS TRACKED TIME COMPARISON ===
+        if (logDurationSecs > 600 && totalTrackedSecs < logDurationSecs * 0.1) {
+          // Log covers significant time but very little was tracked
+          findings.push({
+            severity: 'info',
+            icon: '📊',
+            title: `Log Duration: ${fmtDuration(logDurationSecs)} vs Tracked: ${fmtDuration(totalTrackedSecs)}`,
+            description: `The log file spans <strong>${fmtDuration(logDurationSecs)}</strong>, but only <strong>${fmtDuration(totalTrackedSecs)}</strong> was actually tracked. This is normal - the app continues logging background activity (app focus, URL detection, system monitoring) even when the timer is not running. <strong>Only time between START and STOP events counts as tracked time.</strong>`,
+            action: 'The difference does NOT mean time was lost. Background logs help with diagnostics but do not represent billable time.',
+            techDetail: null
+          });
+        }
+        
+        // === USER STOP EXPLANATION ===
+        if (userStops.length > 0) {
+          const shortSessions = userStops.filter(s => s.duration < 30);
+          if (shortSessions.length > 0) {
+            findings.push({
+              severity: 'info',
+              icon: '🛑',
+              title: `${shortSessions.length} Very Short Session${shortSessions.length > 1 ? 's' : ''} (Stopped by USER)`,
+              description: `Found ${shortSessions.length} session${shortSessions.length > 1 ? 's' : ''} under 30 seconds that ended with stop reason "USER". <strong>What "USER" means:</strong> The stop was logged as a normal user-initiated stop. If the app had crashed or auto-stopped due to errors, we would see different markers (CRASHED, ERROR, CONFIG, or missing stop events).`,
+              action: 'If the user disputes stopping manually, this could indicate: accidental click, mouse/trackpad issue, or another person/process interacting with the app. Network errors, CPU usage, or timezone issues do NOT cause USER stop events.',
+              techDetail: shortSessions.map(s => `${fmtTime(s.start)} → ${fmtTime(s.stop)} (${Math.round(s.duration)}s)`).join('\n')
+            });
+          }
+        }
+        
+        // === CRASH INDICATOR CHECK ===
+        const hasCrashMarkers = data.errors.some(e => 
+          e.msg.toLowerCase().includes('crash') || 
+          e.msg.toLowerCase().includes('watchdog') ||
+          e.msg.toLowerCase().includes('unclean') ||
+          e.msg.toLowerCase().includes('resume_detected')
+        );
+        const hasResumeEvents = data.tracking.some(e => 
+          e.msg.toLowerCase().includes('resume_detected') || 
+          e.msg.toLowerCase().includes('resumed')
+        );
+        
+        if (!hasCrashMarkers && !hasResumeEvents && crashedSessions.length === 0) {
+          findings.push({
+            severity: 'success',
+            icon: '✅',
+            title: 'No Crash Indicators Found',
+            description: 'The logs show no signs of app crashes, force-quits, or unexpected terminations. All sessions have proper START and STOP events. If the app had crashed, we would expect to see: STARTUP_UNCLEAN, RESUME_DETECTED, watchdog hits, or missing STOP events.',
+            action: null,
+            techDetail: null
+          });
+        }
+      } else {
+        // No sessions found
+        findings.push({
+          severity: 'warning',
+          icon: '⏱️',
+          title: 'No Tracking Sessions Found',
+          description: `The log spans <strong>${fmtDuration(logDurationSecs)}</strong> but no START_TRACKING/STOP_TRACKING pairs were detected. This could mean: the timer was never started during this period, or the log file doesn't contain the tracking events.`,
+          action: 'Check if this is the correct log file for the time period in question.',
+          techDetail: null
+        });
+      }
+      
+      // === IDLE SUMMARY ===
+      if (data.idleKeptSecs > 0 || data.idleDiscardedSecs > 0) {
+        const totalIdle = data.idleKeptSecs + data.idleDiscardedSecs;
+        findings.push({
+          severity: 'info',
+          icon: '💤',
+          title: `Idle Time: ${fmtDuration(totalIdle)}`,
+          description: `User went idle ${data.idleDecisions.length} time(s). Kept ${fmtDuration(data.idleKeptSecs)}, discarded ${fmtDuration(data.idleDiscardedSecs)}.`,
+          action: data.idleDiscardedSecs > 0 ? 'Discarded idle time does not count toward tracked hours.' : null,
+          techDetail: null
+        });
+      }
+
+      // === TIMEZONE ===
+      if (data.timezone) {
+        findings.push({
+          severity: 'info',
+          icon: '🌍',
+          title: `Timezone: UTC${data.timezone}`,
+          description: `User's computer timezone offset detected from logs.`,
+          action: null,
+          techDetail: null
+        });
+      }
+
+      // === INJECTED INPUT ===
+      if (data.injected.length > 0) {
+        const onlyInjected = data.injected.filter(e => e.msg.toLowerCase().includes('only injected'));
+        const simulated = data.injected.filter(e => e.msg.toLowerCase().includes('simulated'));
+        
+        let desc = `Detected ${data.injected.length} injected/simulated input event${data.injected.length > 1 ? 's' : ''}.`;
+        if (onlyInjected.length > 0) desc += ` ${onlyInjected.length} showed ONLY injected input (no real input).`;
+        
+        findings.push({
+          severity: onlyInjected.length > 10 ? 'warning' : 'info',
+          icon: '🤖',
+          title: `Injected Input: ${data.injected.length} Events`,
+          description: desc + ` <strong>Common causes:</strong> Remote desktop, accessibility tools, automation software, gaming peripherals with macros.`,
+          action: onlyInjected.length > 10 ? 
+            'High number of "only injected" events. Check if user is using remote desktop or automation tools. Review screenshots for patterns.' : 
+            'Some injected input detected. This is often normal - check the Injected Input section for details.',
+          techDetail: data.injected.slice(0,5).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,80)}`).join('\n')
+        });
+      }
+      
+      // Check for critical issues
+      const watchdogHits = data.errors.filter(e => e.msg.toLowerCase().includes('watchdog'));
+      if (watchdogHits.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🥶',
+          title: `App Froze ${watchdogHits.length} Time${watchdogHits.length > 1 ? 's' : ''}`,
+          description: 'The Hubstaff app became unresponsive and had to recover. This can cause gaps in tracking.',
+          action: 'Ask the user if the app felt slow or frozen. They may need to restart Hubstaff or their computer.',
+          techDetail: watchdogHits.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      const helperCrashes = data.errors.filter(e => e.msg.toLowerCase().includes('helper died') || e.msg.toLowerCase().includes('helper crash'));
+      if (helperCrashes.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🔌',
+          title: 'Browser Extension Crashed',
+          description: 'The Hubstaff browser extension stopped working. This affects URL and app tracking.',
+          action: 'Have the user reinstall the browser extension and restart their browser.',
+          techDetail: helperCrashes.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      const serverErrors = data.network.filter(e => e.msg.match(/response:\s*5\d{2}/i));
+      if (serverErrors.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🌐',
+          title: `${serverErrors.length} Server Error${serverErrors.length > 1 ? 's' : ''} Detected`,
+          description: 'Hubstaff servers returned errors. This may have prevented data from uploading.',
+          action: 'Check status.hubstaff.com for any reported outages during this time period.',
+          techDetail: serverErrors.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      const authErrors = data.network.filter(e => e.msg.match(/response:\s*(401|403)/i));
+      if (authErrors.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🔐',
+          title: 'Authentication Problems',
+          description: 'The user\'s login session may have expired or their permissions changed.',
+          action: 'Have the user log out of Hubstaff completely and log back in.',
+          techDetail: authErrors.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      const discards = data.warnings.filter(e => e.msg.toLowerCase().includes('discard='));
+      if (discards.length > 0) {
+        const lockedDiscards = discards.filter(e => e.msg.toLowerCase().includes('locked'));
+        const futureDiscards = discards.filter(e => e.msg.toLowerCase().includes('future'));
+        
+        if (lockedDiscards.length > 0) {
+          findings.push({
+            severity: 'critical',
+            icon: '🔒',
+            title: 'Time Rejected - Timesheet Locked',
+            description: 'Some tracked time was rejected because the timesheet was already approved/locked.',
+            action: 'An admin needs to unlock the timesheet, or time must be added to a different date.',
+            techDetail: lockedDiscards.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+          });
+        }
+        if (futureDiscards.length > 0) {
+          findings.push({
+            severity: 'critical',
+            icon: '⏰',
+            title: 'Time Rejected - Clock Problem',
+            description: 'Time was rejected because the computer\'s clock was set incorrectly (in the future).',
+            action: 'Have the user check their system date/time settings and enable automatic time.',
+            techDetail: futureDiscards.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+          });
+        }
+      }
+      
+      const memoryIssues = data.warnings.filter(e => e.msg.toLowerCase().includes('memory'));
+      if (memoryIssues.length > 0) {
+        findings.push({
+          severity: 'warning',
+          icon: '💾',
+          title: 'Low Memory Warnings',
+          description: 'The computer was running low on memory (RAM), which can slow down Hubstaff.',
+          action: 'Suggest the user close unused programs or browser tabs.',
+          techDetail: memoryIssues.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      const locationDenied = data.locations.filter(e => e.msg.toLowerCase().includes('denied') || e.msg.toLowerCase().includes('restricted'));
+      if (locationDenied.length > 0) {
+        findings.push({
+          severity: 'warning',
+          icon: '📍',
+          title: 'Location Permission Issues',
+          description: 'Location permissions were denied. Job Sites features won\'t work properly.',
+          action: 'Have the user enable "Always" location permission for Hubstaff in their device settings.',
+          techDetail: locationDenied.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      // Positive findings
+      if (data.screenshots.length > 0 && !data.screenshots.some(e => e.msg.toLowerCase().includes('fail') || e.msg.toLowerCase().includes('error'))) {
+        findings.push({
+          severity: 'success',
+          icon: '📸',
+          title: `${data.screenshots.length} Screenshots Captured`,
+          description: 'Screenshots were captured and uploaded successfully during this period.',
+          action: null,
+          techDetail: null
+        });
+      }
+      
+      if (findings.length === 0) {
+        findings.push({
+          severity: 'success',
+          icon: '✅',
+          title: 'No Major Issues Detected',
+          description: 'The logs look healthy. No critical errors or warnings were found.',
+          action: 'If the user is still experiencing issues, ask for more specific details about what\'s happening.',
+          techDetail: null
+        });
+      }
+      
+      return findings;
+    }
+
+    function hideInfoBox() {
+      $('infoBox').style.display = 'none';
+      if (selectedMarker) { selectedMarker.style.outline = 'none'; selectedMarker = null; }
+    }
+
+    function showInfoBox(e, title, content) {
+      const box = $('infoBox');
+      $('infoTitle').textContent = title;
+      $('infoContent').innerHTML = content;
+      box.style.display = 'block';
+
+      const rect = box.getBoundingClientRect();
+      let top = e.clientY - rect.height - 15;
+      let left = e.clientX - rect.width / 2;
+      
+      if (top < 10) top = e.clientY + 15;
+      if (left < 10) left = 10;
+      if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
+
+      box.style.top = top + 'px';
+      box.style.left = left + 'px';
+    }
+
+    function renderTimeline(data) {
+      if (!data || !data.startTime || !data.endTime) {
+        $('timelineSection').style.display = 'none';
+        return;
+      }
+
+      const min = new Date(data.startTime.getTime() - 60000);
+      const max = new Date(data.endTime.getTime() + 60000);
+      timelineMin = min;
+      timelineDur = max - min;
+
+      const pos = ts => ts ? ((ts - min) / timelineDur) * 100 : 0;
+
+      function renderMarkers(items, trackId, cls) {
+        const track = $(trackId);
+        if (!items.length) { track.innerHTML = ''; return; }
+        
+        track.innerHTML = items.map((item, i) => {
+          const left = pos(item.ts);
+          return `<div class="t-marker ${cls}" data-idx="${i}" data-type="${cls}" style="left:${left}%"></div>`;
+        }).join('');
+
+        track.querySelectorAll('.t-marker').forEach((el, i) => {
+          el.addEventListener('click', e => {
+            e.stopPropagation();
+            hideInfoBox();
+            selectedMarker = el;
+            el.style.outline = '2px solid #fff';
+
+            const item = items[i];
+            const plainMode = $('plainMode').checked;
+            const translation = plainMode ? translateToPlainEnglish(item.msg, item.level, item.src) : null;
+            
+            let content = `<p><span class="label">Time:</span> ${fmtDate(item.ts)}</p>`;
+            if (translation) {
+              content += `<p style="color:var(--accent);margin:8px 0;">${translation.text}</p>`;
+              if (translation.action) {
+                content += `<p style="font-size:11px;color:var(--success);">💡 ${translation.action}</p>`;
+              }
+            }
+            content += `<p><span class="label">Level:</span> ${item.level}</p>`;
+            content += `<p><span class="label">Source:</span> ${escapeHtml(item.src || 'N/A')}</p>`;
+            content += `<div class="msg">${escapeHtml(item.msg.slice(0, 300))}</div>`;
+            
+            const titleText = translation ? translation.text.replace(/^[^\s]+\s/, '') : cls.charAt(0).toUpperCase() + cls.slice(1) + ' Event';
+            showInfoBox(e, titleText.slice(0, 40), content);
+          });
+        });
+      }
+
+      renderMarkers(data.errors, 'trackErrors', 'error');
+      renderMarkers(data.warnings, 'trackWarnings', 'warn');
+      renderMarkers(data.screenshots, 'trackScreenshots', 'screenshot');
+      renderMarkers(data.network, 'trackNetwork', 'network');
+      renderMarkers(data.locations, 'trackLocation', 'location');
+      renderMarkers(data.tracking, 'trackTracking', 'tracking');
+
+      $('tlErrorCount').textContent = data.errors.length;
+      $('tlWarnCount').textContent = data.warnings.length;
+      $('tlScreenCount').textContent = data.screenshots.length;
+      $('tlNetCount').textContent = data.network.length;
+      $('tlLocCount').textContent = data.locations.length;
+      $('tlTrackCount').textContent = data.tracking.length;
+
+      // Time axis
+      const axisPoints = 7;
+      let axisHtml = '';
+      for (let i = 0; i < axisPoints; i++) {
+        const t = new Date(min.getTime() + (timelineDur * i / (axisPoints - 1)));
+        axisHtml += `<span>${t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>`;
+      }
+      $('timeAxis').innerHTML = axisHtml;
+
+      $('timelineSection').style.display = 'block';
+    }
+
+    function analyze(text) {
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      allLines = lines;
+
+      const data = {
+        total: lines.length,
+        errors: [],
+        warnings: [],
+        screenshots: [],
+        network: [],
+        locations: [],
+        apps: [],
+        tracking: [],
+        injected: [],
+        sessions: [],
+        idleDecisions: [],
+        idleKeptSecs: 0,
+        idleDiscardedSecs: 0,
+        timezone: null,
+        startTime: null,
+        endTime: null
+      };
+
+      const showDebug = $('showDebug').checked;
+      const showTrace = $('showTrace').checked;
+      
+      let openSession = null;
+      let lastIdleWakeSecs = null;
+      let lastIdleWakeTime = null;
+
+      for (const line of lines) {
+        const ts = parseTimestamp(line);
+        const level = parseLevel(line);
+        const src = parseSource(line);
+        const msg = parseMessage(line);
+
+        if (ts) {
+          if (!data.startTime || ts < data.startTime) data.startTime = ts;
+          if (!data.endTime || ts > data.endTime) data.endTime = ts;
+        }
+
+        // Extract timezone from first line that has one
+        if (!data.timezone) {
+          const tz = parseTimezone(line);
+          if (tz) data.timezone = tz;
+        }
+        
+        // Also check for TZ Offset line specifically (higher priority)
+        if (line.includes('TZ Offset')) {
+          const tz = parseTimezone(line);
+          if (tz) data.timezone = tz;
+        }
+
+        if (!showDebug && level === 'DEBUG') continue;
+        if (!showTrace && level === 'TRACE') continue;
+
+        const entry = { ts, level, src, msg, raw: line };
+
+        // === SESSION TRACKING (START/STOP) ===
+        if (line.includes('START_TRACKING') || line.includes('Tracking Started')) {
+          let reason = 'USER';
+          if (line.includes('[RESUMED]') || line.toLowerCase().includes('resumed')) reason = 'RESUMED';
+          else if (line.includes('[IDLE]')) reason = 'IDLE';
+          
+          if (openSession) {
+            // Unclosed session - mark as crashed
+            openSession.stop = ts;
+            openSession.stopReason = 'CRASHED';
+            openSession.duration = (openSession.stop - openSession.start) / 1000;
+            data.sessions.push(openSession);
+          }
+          openSession = { start: ts, startReason: reason, stop: null, stopReason: null, duration: 0 };
+        }
+        
+        if (line.includes('STOP_TRACKING') || line.includes('Tracking Stopped')) {
+          let reason = 'USER';
+          if (line.includes('[IDLE]')) reason = 'IDLE';
+          else if (line.includes('[CONFIGURATION]')) reason = 'CONFIG';
+          else if (line.includes('[PROJECT_CONFIGURATION_LOCATION]')) reason = 'LEFT_JOBSITE';
+          else if (line.includes('[SHUTDOWN]')) reason = 'SHUTDOWN';
+          
+          if (openSession) {
+            openSession.stop = ts;
+            openSession.stopReason = reason;
+            openSession.duration = (openSession.stop - openSession.start) / 1000;
+            data.sessions.push(openSession);
+            openSession = null;
+          }
+        }
+
+        // === IDLE TRACKING ===
+        // Capture IDLE_WAKE seconds
+        if (line.includes('IDLE_WAKE') || (line.includes('Idle') && line.includes('wake'))) {
+          const secsMatch = line.match(/(?:after|for)\s+(\d+)\s+seconds?/i);
+          if (secsMatch) {
+            lastIdleWakeSecs = parseInt(secsMatch[1]);
+            lastIdleWakeTime = ts;
+          }
+        }
+        
+        // Capture idle decisions (KeepIdle / StopTracking)
+        if (line.includes('KeepIdle') || line.includes('StopTracking')) {
+          const keepMatch = line.match(/KeepIdle[:\s]+(\d+)/i);
+          const stopMatch = line.match(/StopTracking[:\s]+(\d+)/i);
+          
+          const kept = keepMatch && keepMatch[1] === '1';
+          const discarded = stopMatch && stopMatch[1] === '1';
+          
+          if (kept || discarded) {
+            const idleSecs = lastIdleWakeSecs || 0;
+            data.idleDecisions.push({
+              ts: ts,
+              seconds: idleSecs,
+              decision: kept ? 'KEPT' : 'DISCARDED'
+            });
+            
+            if (kept) data.idleKeptSecs += idleSecs;
+            else if (discarded) data.idleDiscardedSecs += idleSecs;
+            
+            lastIdleWakeSecs = null;
+          }
+        }
+
+        // Errors
+        if (level === 'ERROR' || line.includes('main_watchdog hit') || line.includes('Helper died') || line.includes('crash') || line.includes('FATAL')) {
+          data.errors.push(entry);
+        }
+
+        // Warnings
+        if (level === 'WARN' || line.includes('Discard=') || line.includes('OS Memory') || line.includes('Server Error') || line.includes('traffic issue')) {
+          data.warnings.push(entry);
+        }
+
+        // Screenshots
+        if (line.includes('Uploading Screen') || line.includes('Capture Screen') || line.includes('ScreenData') || line.includes('screenshot') || line.includes('Screenshot')) {
+          data.screenshots.push(entry);
+        }
+
+        // Network
+        if (line.match(/Response:\s*[45]\d{2}/) || line.includes('Server Error') || line.includes('Network') || line.includes('CURL') || line.includes('traffic issue')) {
+          data.network.push(entry);
+        }
+
+        // Locations
+        if (line.includes('feed: sites') || line.includes('LocationFeatureState') || line.includes('LocationManager') || line.includes('geofence') || line.includes('Geofence') || line.includes('Job Site')) {
+          data.locations.push(entry);
+        }
+
+        // Apps & URLs
+        if (line.includes('URL:') || line.includes('TITLE:') || line.includes('APP:') || line.includes('ApplicationGrabber')) {
+          data.apps.push(entry);
+        }
+
+        // Tracking events
+        if (line.includes('Resume') || line.includes('Idle') || line.includes('Discard=') || line.includes('Startup') || line.includes('START_TRACKING') || line.includes('STOP_TRACKING')) {
+          data.tracking.push(entry);
+        }
+      }
+
+      return data;
+    }
+
+    function renderLevelTag(level) {
+      const cls = level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : level === 'AUDIT' ? 'audit' : level === 'INFO' ? 'info' : level === 'DEBUG' ? 'debug' : 'trace';
+      return `<span class="tag ${cls}">${level}</span>`;
+    }
+
+    function render(data) {
+      const plainMode = $('plainMode').checked;
+      
+      if (!data) {
+        $('kpiTotal').textContent = '0';
+        $('kpiErrors').textContent = '0';
+        $('kpiWarnings').textContent = '0';
+        $('kpiTrackedTime').textContent = '0:00:00';
+        $('kpiIdleKept').textContent = '0:00:00';
+        $('kpiIdleDisc').textContent = '0:00:00';
+        $('kpiTimezone').textContent = '--';
+        $('kpiTimeSpan').textContent = '--';
+        $('errorsList').innerHTML = '<div class="event-item" style="color:var(--muted)">No errors found</div>';
+        $('warningsList').innerHTML = '<div class="event-item" style="color:var(--muted)">No warnings found</div>';
+        $('screenshotsBody').innerHTML = '';
+        $('networkBody').innerHTML = '';
+        $('locationsBody').innerHTML = '';
+        $('appsBody').innerHTML = '';
+        $('trackingBody').innerHTML = '';
+        $('searchBody').innerHTML = '';
+        $('summaryCard').style.display = 'none';
+        $('sessionsCard').style.display = 'none';
+        $('sessionsBody').innerHTML = '';
+        $('idleBody').innerHTML = '';
+        // Reset badge counts
+        ['errors', 'warnings', 'screenshots', 'network', 'locations', 'apps', 'injected', 'tracking', 'search', 'sessions'].forEach(s => {
+          const badge = $(s + 'Count');
+          if (badge) badge.textContent = '0';
+        });
+        $('injectedBody').innerHTML = '';
+        return;
+      }
+
+      // Calculate total tracked time
+      const totalTrackedSecs = data.sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+      $('kpiTotal').textContent = data.total.toLocaleString();
+      $('kpiErrors').textContent = data.errors.length;
+      $('kpiWarnings').textContent = data.warnings.length;
+      $('kpiTrackedTime').textContent = fmtDuration(totalTrackedSecs);
+      $('kpiIdleKept').textContent = fmtDuration(data.idleKeptSecs);
+      $('kpiIdleDisc').textContent = fmtDuration(data.idleDiscardedSecs);
+      $('kpiTimezone').textContent = data.timezone || 'Unknown';
+      $('kpiTimezone').style.fontSize = data.timezone ? '18px' : '14px';
+
+      // Update badge counts
+      $('errorsCount').textContent = data.errors.length;
+      $('warningsCount').textContent = data.warnings.length;
+      $('screenshotsCount').textContent = data.screenshots.length;
+      $('networkCount').textContent = data.network.length;
+      $('locationsCount').textContent = data.locations.length;
+      $('appsCount').textContent = data.apps.length;
+      $('injectedCount').textContent = data.injected.length;
+      $('trackingCount').textContent = data.tracking.length;
+      $('sessionsCount').textContent = data.sessions.length;
+
+      // Update badge colors based on counts
+      $('errorsCount').className = 'badge ' + (data.errors.length > 0 ? 'danger' : '');
+      $('warningsCount').className = 'badge ' + (data.warnings.length > 0 ? 'warn' : '');
+      $('networkCount').className = 'badge ' + (data.network.length > 0 ? 'warn' : '');
+      $('injectedCount').className = 'badge ' + (data.injected.length > 0 ? 'warn' : '');
+
+      if (data.startTime && data.endTime) {
+        const diffMs = data.endTime - data.startTime;
+        const hrs = Math.floor(diffMs / 3600000);
+        const mins = Math.floor((diffMs % 3600000) / 60000);
+        $('kpiTimeSpan').textContent = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+      } else {
+        $('kpiTimeSpan').textContent = '--';
+      }
+
+      // Generate and render summary if plain mode
+      if (plainMode) {
+        const findings = generateSummary(data);
+        $('summaryCard').style.display = 'block';
+        $('summaryContent').innerHTML = findings.map((f, i) => `
+          <div class="summary-item ${f.severity}">
+            <h4>${f.icon} ${f.title} ${f.techDetail ? `<span class="show-tech" onclick="toggleTech(${i})">Show technical</span>` : ''}</h4>
+            <p>${f.description}</p>
+            ${f.action ? `<div class="action">💡 <strong>What to do:</strong> ${f.action}</div>` : ''}
+            ${f.techDetail ? `<div class="tech-detail" id="tech-${i}">${escapeHtml(f.techDetail)}</div>` : ''}
+          </div>
+        `).join('');
+      } else {
+        $('summaryCard').style.display = 'none';
+      }
+
+      // === RENDER SESSIONS TABLE ===
+      if (data.sessions.length > 0) {
+        $('sessionsCard').style.display = 'block';
+        $('stopReasonLegend').style.display = plainMode ? 'block' : 'none';
+        
+        // Calculate log duration vs tracked time
+        const logDurationSecs = data.startTime && data.endTime ? (data.endTime - data.startTime) / 1000 : 0;
+        const totalTrackedSecs = data.sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+        const hasShortUserStops = data.sessions.some(s => s.stopReason === 'USER' && s.duration < 60);
+        
+        // Show explainer if there's a big mismatch or short USER stops
+        if (plainMode && (logDurationSecs > 600 && totalTrackedSecs < logDurationSecs * 0.1) || hasShortUserStops) {
+          let explainerHtml = '<h4>📖 Understanding These Results</h4>';
+          
+          if (logDurationSecs > 600 && totalTrackedSecs < logDurationSecs * 0.1) {
+            explainerHtml += `
+              <p><span class="key-point">Why does the log cover ${fmtDuration(logDurationSecs)} but only ${fmtDuration(totalTrackedSecs)} was tracked?</span></p>
+              <p>The Hubstaff app continuously logs background activity (app focus, URLs, system status) even when the timer is <strong>not</strong> running. This is normal diagnostic behavior.</p>
+              <ul>
+                <li>Only time between START_TRACKING and STOP_TRACKING counts as billable time</li>
+                <li>Background logs do NOT represent lost or missing time</li>
+                <li>The ${fmtDuration(logDurationSecs)} log window includes all app activity, not just tracked time</li>
+              </ul>
+            `;
+          }
+          
+          if (hasShortUserStops) {
+            const shortSessions = data.sessions.filter(s => s.stopReason === 'USER' && s.duration < 60);
+            explainerHtml += `
+              <p><span class="key-point">What does "User stopped" mean?</span></p>
+              <p>The stop was logged as a normal, user-initiated stop. This is <strong>not</strong> a crash or error.</p>
+              <ul>
+                <li>If the app had crashed → we'd see "Crashed" or missing stop events</li>
+                <li>If an error caused it → we'd see error markers in the stop reason</li>
+                <li>Network errors, high CPU, or timezone issues do NOT cause "User stopped" events</li>
+              </ul>
+              <p>If the user disputes stopping manually, possible explanations include: accidental click, trackpad sensitivity, another user, or remote access software.</p>
+            `;
+          }
+          
+          $('sessionExplainer').innerHTML = explainerHtml;
+          $('sessionExplainer').style.display = 'block';
+        } else {
+          $('sessionExplainer').style.display = 'none';
+        }
+        
+        $('sessionsBody').innerHTML = data.sessions.map((s, i) => {
+          const stopReasonCls = s.stopReason === 'USER' ? 'success' : 
+                                s.stopReason === 'IDLE' ? 'warn' : 
+                                s.stopReason === 'CRASHED' || s.stopReason === 'LOG_END' ? 'error' :
+                                s.stopReason === 'CONFIG' || s.stopReason === 'LEFT_JOBSITE' ? 'error' : 'info';
+          const startReasonBadge = s.startReason === 'RESUMED' ? '<span class="tag audit" style="margin-left:4px;">RESUMED</span>' : '';
+          
+          let stopReasonText = s.stopReason;
+          let stopReasonTooltip = '';
+          if (plainMode) {
+            if (s.stopReason === 'USER') {
+              stopReasonText = 'User stopped';
+              stopReasonTooltip = 'Logged as normal user stop. Not a crash or error.';
+            }
+            else if (s.stopReason === 'IDLE') stopReasonText = 'Went idle';
+            else if (s.stopReason === 'CRASHED') stopReasonText = '⚠️ Crashed';
+            else if (s.stopReason === 'LOG_END') stopReasonText = '⚠️ Still running?';
+            else if (s.stopReason === 'CONFIG') stopReasonText = 'Config/Limit';
+            else if (s.stopReason === 'LEFT_JOBSITE') stopReasonText = '📍 Left Job Site';
+            else if (s.stopReason === 'SHUTDOWN') stopReasonText = 'App closed';
+          }
+          
+          const durationWarning = s.duration < 30 ? ' ⚡' : '';
+          
+          return `<tr>
+            <td>${i + 1}${startReasonBadge}</td>
+            <td>${fmtTime(s.start)}</td>
+            <td>${s.stop ? fmtTime(s.stop) : '--'}</td>
+            <td><span class="tag success">${fmtDuration(s.duration)}${durationWarning}</span></td>
+            <td><span class="tag ${stopReasonCls}" ${stopReasonTooltip ? `title="${stopReasonTooltip}"` : ''}>${stopReasonText}</span></td>
+          </tr>`;
+        }).join('');
+      } else {
+        $('sessionsCard').style.display = 'block';
+        $('sessionsBody').innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No tracking sessions found in log</td></tr>';
+        $('sessionExplainer').style.display = 'none';
+        $('stopReasonLegend').style.display = 'none';
+      }
+
+      // === RENDER IDLE DECISIONS TABLE ===
+      if (data.idleDecisions.length > 0) {
+        $('idleBody').innerHTML = data.idleDecisions.map(d => {
+          const decisionCls = d.decision === 'KEPT' ? 'success' : 'warn';
+          const decisionText = plainMode ? 
+            (d.decision === 'KEPT' ? '✅ Kept the time' : '❌ Discarded') : 
+            d.decision;
+          return `<tr>
+            <td>${fmtTime(d.ts)}</td>
+            <td>${fmtDuration(d.seconds)}</td>
+            <td><span class="tag ${decisionCls}">${decisionText}</span></td>
+          </tr>`;
+        }).join('');
+      } else {
+        $('idleBody').innerHTML = '<tr><td colspan="3" style="color:var(--muted)">No idle decisions recorded</td></tr>';
+      }
+
+      // Errors
+      if (data.errors.length) {
+        $('errorsList').innerHTML = data.errors.slice(0, 100).map(e => {
+          const translation = plainMode ? translateToPlainEnglish(e.msg, e.level, e.src) : null;
+          return `
+            <div class="event-item">
+              <div class="event-time">${fmtTime(e.ts)} ${renderLevelTag(e.level)}</div>
+              ${translation ? `<div class="plain-explanation">${translation.text}</div>` : ''}
+              <div class="event-detail" style="${plainMode ? 'font-size:10px;color:#666;' : ''}">${escapeHtml(e.msg.slice(0, 200))}</div>
+              <div class="event-context">${escapeHtml(e.src)}</div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        $('errorsList').innerHTML = '<div class="event-item" style="color:var(--success)">✓ No errors found</div>';
+      }
+
+      // Warnings
+      if (data.warnings.length) {
+        $('warningsList').innerHTML = data.warnings.slice(0, 100).map(e => {
+          const translation = plainMode ? translateToPlainEnglish(e.msg, e.level, e.src) : null;
+          return `
+            <div class="event-item">
+              <div class="event-time">${fmtTime(e.ts)} ${renderLevelTag(e.level)}</div>
+              ${translation ? `<div class="plain-explanation">${translation.text}</div>` : ''}
+              <div class="event-detail" style="${plainMode ? 'font-size:10px;color:#666;' : ''}">${escapeHtml(e.msg.slice(0, 200))}</div>
+              <div class="event-context">${escapeHtml(e.src)}</div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        $('warningsList').innerHTML = '<div class="event-item" style="color:var(--success)">✓ No warnings found</div>';
+      }
+
+      // Screenshots
+      $('screenshotsBody').innerHTML = data.screenshots.slice(0, 50).map(e => `
+        <tr>
+          <td>${fmtTime(e.ts)}</td>
+          <td>${renderLevelTag(e.level)}</td>
+          <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="3" style="color:var(--muted)">No screenshot events found</td></tr>';
+
+      // Network
+      $('networkBody').innerHTML = data.network.slice(0, 50).map(e => {
+        let statusCls = 'info';
+        if (e.msg.match(/Response:\s*[45]\d{2}/)) statusCls = 'error';
+        else if (e.msg.includes('Error')) statusCls = 'error';
+        return `
+          <tr>
+            <td>${fmtTime(e.ts)}</td>
+            <td><span class="tag ${statusCls}">${e.level}</span></td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No network issues found</td></tr>';
+
+      // Locations
+      $('locationsBody').innerHTML = data.locations.slice(0, 50).map(e => `
+        <tr>
+          <td>${fmtTime(e.ts)}</td>
+          <td>${renderLevelTag(e.level)}</td>
+          <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="3" style="color:var(--muted)">No location events found</td></tr>';
+
+      // Apps
+      $('appsBody').innerHTML = data.apps.slice(0, 50).map(e => {
+        let type = 'App';
+        if (e.msg.includes('URL:')) type = 'URL';
+        else if (e.msg.includes('TITLE:')) type = 'Title';
+        return `
+          <tr>
+            <td>${fmtTime(e.ts)}</td>
+            <td><span class="tag info">${type}</span></td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No app/URL events found</td></tr>';
+
+      // Injected Input
+      $('injectedBody').innerHTML = data.injected.slice(0, 100).map(e => {
+        let type = 'Injected';
+        if (e.msg.toLowerCase().includes('simulated')) type = 'Simulated';
+        else if (e.msg.toLowerCase().includes('partially')) type = 'Partial';
+        else if (e.msg.toLowerCase().includes('only injected')) type = 'Only Injected';
+        return `
+          <tr>
+            <td>${fmtTime(e.ts)}</td>
+            <td><span class="tag warn">${type}</span></td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="3" style="color:var(--success)">✓ No injected input detected</td></tr>';
+
+      // Tracking
+      $('trackingBody').innerHTML = data.tracking.slice(0, 50).map(e => {
+        let eventType = 'Event';
+        if (e.msg.includes('Resume')) eventType = 'Resume';
+        else if (e.msg.includes('Idle')) eventType = 'Idle';
+        else if (e.msg.includes('Discard')) eventType = 'Discard';
+        else if (e.msg.includes('Startup')) eventType = 'Startup';
+        else if (e.msg.includes('START_TRACKING')) eventType = 'Start';
+        else if (e.msg.includes('STOP_TRACKING')) eventType = 'Stop';
+        const typeCls = eventType === 'Discard' ? 'warn' : eventType === 'Resume' ? 'success' : 'info';
+        return `
+          <tr>
+            <td>${fmtTime(e.ts)}</td>
+            <td><span class="tag ${typeCls}">${eventType}</span></td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No tracking events found</td></tr>';
+
+      // Render timeline
+      renderTimeline(data);
+    }
+
+    function search(query) {
+      if (!query.trim()) {
+        $('searchBody').innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Enter a search term above</td></tr>';
+        $('searchCount').textContent = '0';
+        return;
+      }
+
+      const q = query.toLowerCase();
+      const results = allLines.filter(line => line.toLowerCase().includes(q)).slice(0, 200);
+
+      $('searchCount').textContent = results.length;
+      
+      // Auto-expand search section when searching
+      expandSection('search');
+
+      if (!results.length) {
+        $('searchBody').innerHTML = `<tr><td colspan="4" style="color:var(--muted)">No results for "${escapeHtml(query)}"</td></tr>`;
+        return;
+      }
+
+      $('searchBody').innerHTML = results.map(line => {
+        const ts = parseTimestamp(line);
+        const level = parseLevel(line);
+        const src = parseSource(line);
+        const msg = parseMessage(line);
+        const highlightedMsg = escapeHtml(msg).replace(new RegExp(`(${escapeHtml(query)})`, 'gi'), '<mark class="highlight">$1</mark>');
+        return `
+          <tr>
+            <td style="white-space:nowrap;">${fmtTime(ts)}</td>
+            <td>${renderLevelTag(level)}</td>
+            <td style="font-size:10px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(src)}</td>
+            <td style="font-size:11px;">${highlightedMsg}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    $('analyzeBtn').onclick = () => {
+      const text = $('logInput').value;
+      if (!text.trim()) {
+        $('status').textContent = 'Please paste log content first';
+        $('status').className = 'status error';
+        return;
+      }
+
+      let lines = text.split(/\r?\n/);
+      const originalCount = lines.filter(l => l.trim()).length;
+      
+      if ($('autoFilter').checked) {
+        lines = filterLogs(lines);
+        const filteredCount = lines.length;
+        const removedCount = originalCount - filteredCount;
+        const pct = originalCount > 0 ? ((removedCount / originalCount) * 100).toFixed(1) : 0;
+        $('filterStats').style.display = 'block';
+        $('filterStatsText').innerHTML = `🔮 <strong>Filtered:</strong> ${originalCount.toLocaleString()} → ${filteredCount.toLocaleString()} lines (removed ${removedCount.toLocaleString()} noise lines, ${pct}%)`;
+      } else {
+        $('filterStats').style.display = 'none';
+      }
+
+      parsedData = analyze(lines.join('\n'));
+      render(parsedData);
+      $('status').textContent = `Analyzed ${parsedData.total.toLocaleString()} lines`;
+      $('status').className = 'status success';
+    };
+
+    $('clearBtn').onclick = () => {
+      $('logInput').value = '';
+      $('searchInput').value = '';
+      allLines = [];
+      parsedData = null;
+      timelineMin = null;
+      timelineDur = null;
+      render(null);
+      $('timelineSection').style.display = 'none';
+      $('filterStats').style.display = 'none';
+      hideInfoBox();
+      $('status').textContent = '🔒 All data cleared';
+      $('status').className = 'status success';
+      setTimeout(() => { $('status').textContent = ''; }, 2000);
+    };
+
+    $('searchBtn').onclick = () => search($('searchInput').value);
+    $('searchInput').onkeydown = e => { if (e.key === 'Enter') search($('searchInput').value); };
+    $('clearSearchBtn').onclick = () => {
+      $('searchInput').value = '';
+      $('searchBody').innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Enter a search term above</td></tr>';
+    };
+
+    $('showDebug').onchange = () => { if (parsedData) { parsedData = analyze($('logInput').value); render(parsedData); } };
+    $('showTrace').onchange = () => { if (parsedData) { parsedData = analyze($('logInput').value); render(parsedData); } };
+    $('plainMode').onchange = () => { if (parsedData) render(parsedData); };
+
+    // Toggle technical details in summary
+    window.toggleTech = function(idx) {
+      const el = $('tech-' + idx);
+      if (el) el.classList.toggle('visible');
+    };
+
+    // Toggle collapsible sections
+    window.toggleSection = function(section) {
+      const header = document.querySelector(`#${section}Content`).previousElementSibling;
+      const content = $(`${section}Content`);
+      header.classList.toggle('collapsed');
+      content.classList.toggle('collapsed');
+    };
+
+    // Toggle filter details
+    window.toggleFilterDetails = function() {
+      const details = $('filterDetails');
+      const toggle = $('filterDetailsToggle');
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        toggle.textContent = 'Hide details';
+      } else {
+        details.style.display = 'none';
+        toggle.textContent = 'What was removed?';
+      }
+    };
+
+    // Expand section (used when searching)
+    function expandSection(section) {
+      const header = document.querySelector(`#${section}Content`).previousElementSibling;
+      const content = $(`${section}Content`);
+      header.classList.remove('collapsed');
+      content.classList.remove('collapsed');
+    }
+
+    $('helpBtn').onclick = () => $('helpModal').classList.add('visible');
+    $('closeHelp').onclick = () => $('helpModal').classList.remove('visible');
+    $('helpModal').onclick = e => { if (e.target === $('helpModal')) $('helpModal').classList.remove('visible'); };
+
+    $('privacyBtn').onclick = () => $('privacyModal').classList.add('visible');
+    $('closePrivacy').onclick = () => $('privacyModal').classList.remove('visible');
+    $('privacyModal').onclick = e => { if (e.target === $('privacyModal')) $('privacyModal').classList.remove('visible'); };
+
+    // Timeline zoom controls
+    $('zoomSlider').oninput = function() {
+      $('timelineContent').style.width = (this.value * 100) + '%';
+    };
+
+    $('resetZoom').onclick = () => {
+      $('zoomSlider').value = 1;
+      $('timelineContent').style.width = '100%';
+      $('timelineContainer').scrollLeft = 0;
+      hideInfoBox();
+    };
+
+    // Close info box on click outside
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.info-box') && !e.target.closest('.t-marker')) {
+        hideInfoBox();
+      }
+    });
+
+    // Timeline track toggles
+    const trackToggles = [
+      { toggle: 'togErrors', label: 'labelErrors', track: 'trackErrors' },
+      { toggle: 'togWarnings', label: 'labelWarnings', track: 'trackWarnings' },
+      { toggle: 'togScreenshots', label: 'labelScreenshots', track: 'trackScreenshots' },
+      { toggle: 'togNetwork', label: 'labelNetwork', track: 'trackNetwork' },
+      { toggle: 'togLocation', label: 'labelLocation', track: 'trackLocation' },
+      { toggle: 'togTracking', label: 'labelTracking', track: 'trackTracking' },
+    ];
+
+    trackToggles.forEach(({ toggle, label, track }) => {
+      $(toggle).onchange = function() {
+        const isVisible = this.checked;
+        $(label).classList.toggle('hidden', !isVisible);
+        $(track).classList.toggle('hidden', !isVisible);
+        this.parentElement.classList.toggle('disabled', !isVisible);
+      };
+    });
+
+    document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        $('analyzeBtn').click();
+      }
+    });
+
+    // Clear all data when page is closed
+    window.addEventListener('beforeunload', () => {
+      $('logInput').value = '';
+      if (allLines) allLines.length = 0;
+      if (parsedData) {
+        if (parsedData.errors) parsedData.errors.length = 0;
+        if (parsedData.warnings) parsedData.warnings.length = 0;
+        if (parsedData.screenshots) parsedData.screenshots.length = 0;
+        if (parsedData.network) parsedData.network.length = 0;
+        if (parsedData.locations) parsedData.locations.length = 0;
+        if (parsedData.apps) parsedData.apps.length = 0;
+        if (parsedData.tracking) parsedData.tracking.length = 0;
+        if (parsedData.sessions) parsedData.sessions.length = 0;
+        if (parsedData.idleDecisions) parsedData.idleDecisions.length = 0;
+      }
+      parsedData = null;
+      allLines = [];
+    });
+  </script>
+</body>
+</html>
