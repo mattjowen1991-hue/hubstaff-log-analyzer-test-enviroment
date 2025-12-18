@@ -746,6 +746,39 @@
         <li><code>screenshot</code> - Find screenshot events</li>
         <li><code>Discard</code> - Find rejected time</li>
       </ul>
+      <h3>iOS Location Troubleshooting</h3>
+      <p>For iOS location/job site issues, check these settings:</p>
+      <ul>
+        <li><strong>Location Services:</strong> Settings → Privacy & Security → Location Services → ON</li>
+        <li><strong>Hubstaff Permission:</strong> Settings → Hubstaff → Location → <code>Always</code></li>
+        <li><strong>Precise Location:</strong> Settings → Hubstaff → Precise Location → ON</li>
+        <li><strong>Background Refresh:</strong> Settings → General → Background App Refresh → Hubstaff → ON</li>
+      </ul>
+      <p><strong>Important:</strong> "While Using" permission is NOT sufficient - Hubstaff requires "Always" to track locations in the background.</p>
+
+      <h3>Android Location Troubleshooting</h3>
+      <ul>
+        <li><strong>Location Permission:</strong> Settings → Apps → Hubstaff → Permissions → Location → "Allow all the time"</li>
+        <li><strong>Location Mode:</strong> Enable "High accuracy" mode (GPS + Network)</li>
+        <li><strong>Battery Optimization:</strong> Exclude Hubstaff from battery optimization/Doze</li>
+      </ul>
+
+      <h3>Primary Device</h3>
+      <p>Only the <strong>primary device</strong> can record locations and trigger job site automations. If you see "not primary" errors:</p>
+      <ul>
+        <li>The user logged into a newer device, making the old one non-primary</li>
+        <li>A banner should appear on the Timer screen to "Make Primary"</li>
+        <li>Check Admin → User page to see which device is currently primary</li>
+      </ul>
+
+      <h3>Job Site Detection Issues</h3>
+      <p>If job sites aren't being detected properly:</p>
+      <ul>
+        <li>Increase job site radius to 100-150m (especially for indoor locations)</li>
+        <li>Check if user has good GPS signal (outdoor, clear sky view)</li>
+        <li>Verify the job site is correctly placed on the map</li>
+        <li>Look for <code>[Site] Region</code> and <code>[Position]</code> entries in logs</li>
+      </ul>
     </div>
   </div>
 
@@ -758,6 +791,60 @@
     let timelineMin = null;
     let timelineDur = null;
     let selectedMarker = null;
+
+    // === iOS/LOCATION LOG PATTERNS ===
+    const LOCATION_PATTERNS = {
+      errors: [
+        { pattern: /\[Position\] Couldn't obtain location/i, meaning: "📍 Device cannot access user's location", action: "Check if location services are enabled and permissions are set to 'Always'" },
+        { pattern: /\[Site\] Region issue/i, meaning: "📍 Problem monitoring job site region", action: "May affect job site detection. Check location permissions and GPS signal." },
+        { pattern: /\[LocationResolution\].*error/i, meaning: "📍 Failed to resolve location name", action: "Geocoding issue - may show coordinates instead of address names." },
+      ],
+      audit: [
+        { pattern: /Locations needed but non-primary device/i, meaning: "📱 Can't track - this isn't the primary device", action: "User needs to tap the banner to make this device primary, or use their primary device." },
+        { pattern: /Locations needed but unavailable/i, meaning: "📍 Can't track - location not available", action: "Check: Location Services ON, Hubstaff permission set to 'Always', Precise Location ON" },
+        { pattern: /Must visit.*currently at/i, meaning: "📍 Can't start timer - not at a job site", action: "User must be physically at a job site to start tracking (Restrict timer to job sites is ON)" },
+        { pattern: /\[Site\] Handle.*ENTER.*passive/i, meaning: "📍 Entered job site (detected in background)", action: null },
+        { pattern: /\[Site\] Handle.*ENTER.*active/i, meaning: "📍 Entered job site (while tracking)", action: null },
+        { pattern: /\[Site\] Handle.*EXIT.*passive/i, meaning: "📍 Left job site (detected in background)", action: null },
+        { pattern: /\[Site\] Handle.*EXIT.*active/i, meaning: "📍 Left job site (while tracking)", action: null },
+        { pattern: /auto-start project/i, meaning: "▶️ Timer auto-started by job site rule", action: null },
+        { pattern: /auto-stop project/i, meaning: "⏹️ Timer auto-stopped by job site rule", action: null },
+        { pattern: /DID NOT auto-start.*was prevented/i, meaning: "⚠️ Job site tried to auto-start but was blocked", action: "Check logs above this for the specific reason." },
+        { pattern: /DID NOT auto-start.*already tracking/i, meaning: "ℹ️ Job site didn't auto-start - already tracking another project", action: "Normal behavior - won't interrupt current work." },
+        { pattern: /WILL NOT auto-start.*not primary/i, meaning: "📱 Job site won't auto-start - not primary device", action: "User needs to make this device primary." },
+        { pattern: /DID NOT auto-stop.*is tracking project/i, meaning: "ℹ️ Job site didn't auto-stop - tracking different project", action: "Normal - only stops if tracking the site's configured project." },
+        { pattern: /WILL NOT auto-stop.*not primary/i, meaning: "📱 Job site won't auto-stop - not primary device", action: "User needs to make this device primary." },
+        { pattern: /notify reminder/i, meaning: "🔔 Sent reminder notification to user", action: null },
+      ],
+      info: [
+        { pattern: /\[LocationRequest\].*not the user's primary device/i, meaning: "📱 Location request ignored - not primary device", action: "Only the primary device reports locations." },
+        { pattern: /\[LocationRequest\].*locations are not available/i, meaning: "📍 Location request failed - unavailable", action: "Check location permissions and services." },
+        { pattern: /\[LocationRequest\].*neither active or passive/i, meaning: "📍 Location request ignored - not recording", action: "Track Locations may be Off, or timer not running." },
+        { pattern: /Discarding simulated locations/i, meaning: "🚫 Fake/simulated location detected and ignored", action: "User may be using a location spoofing app - this is blocked." },
+        { pattern: /\[Site\] REGION STOP/i, meaning: "📍 Stopped monitoring a job site region", action: null },
+        { pattern: /\[Site\] REGION START/i, meaning: "📍 Started monitoring a job site region", action: null },
+        { pattern: /suspicious movement/i, meaning: "🚗 Fast movement detected - rechecking job sites", action: "User may be driving away from site." },
+      ],
+      trace: [
+        { pattern: /Primary changed/i, meaning: "📱 Primary device status changed", action: null },
+        { pattern: /Location Availability changed/i, meaning: "📍 Location availability changed", action: null },
+        { pattern: /Recording changed/i, meaning: "📍 Location recording state changed", action: null },
+        { pattern: /AccuracyLimited changed/i, meaning: "🔋 Location accuracy limited (low power/hot device)", action: null },
+      ]
+    };
+
+    function checkLocationPatterns(msg, level) {
+      const patterns = LOCATION_PATTERNS[level.toLowerCase()] || [];
+      for (const p of patterns) {
+        if (p.pattern.test(msg)) return { text: p.meaning, action: p.action };
+      }
+      for (const lvl of ['errors', 'audit', 'info', 'trace']) {
+        for (const p of LOCATION_PATTERNS[lvl] || []) {
+          if (p.pattern.test(msg)) return { text: p.meaning, action: p.action };
+        }
+      }
+      return null;
+    }
 
     // === NOISE FILTER PATTERNS ===
     const NOISE_PATTERNS = [
@@ -888,6 +975,10 @@
     function translateToPlainEnglish(msg, level, src) {
       const m = msg.toLowerCase();
       
+      // Check location-specific patterns first
+      const locTranslation = checkLocationPatterns(msg, level);
+      if (locTranslation) return { ...locTranslation, severity: level === 'ERROR' ? 'critical' : level === 'WARN' ? 'warning' : 'info' };
+      
       // Watchdog / Freezing
       if (m.includes('main_watchdog hit')) 
         return { text: "⚠️ The app froze or became unresponsive", action: "Ask user if app felt slow/frozen. May need to restart the app.", severity: "critical" };
@@ -929,6 +1020,16 @@
         if (m.includes('duplicate')) return { text: "📋 Time rejected - already recorded", action: "This time was already uploaded. No action needed.", severity: "info" };
         return { text: "❌ Tracked time was rejected by the server", action: "Check the specific reason. May need manual time entry.", severity: "critical" };
       }
+      if (m.includes('resume_ignored'))
+        return { text: "⏭️ Resume time was auto-discarded by policy", action: "User should open app periodically to confirm timer is intentional.", severity: "warning" };
+      if (m.includes('resume_cancelled'))
+        return { text: "❌ User chose not to keep resumed time", action: null, severity: "info" };
+      if (m.includes('resume_detected'))
+        return { text: "🔄 Timer was left running when app closed - recovering time", action: null, severity: "info" };
+      if (m.includes('start_ignored'))
+        return { text: "🚫 Timer start was blocked by a policy", action: "Check organization policies - may be location restriction, limit, or schedule.", severity: "warning" };
+      if (m.includes('tracking_stopped'))
+        return { text: "⏹️ Tracking was stopped by the system", action: "Check logs for specific reason (limit reached, policy, error).", severity: "warning" };
       if (m.includes('resume') && !m.includes('resume_ignored'))
         return { text: "▶️ Tracking resumed after interruption", action: null, severity: "info" };
       if (m.includes('idle') && m.includes('wake'))
@@ -1101,6 +1202,61 @@
       }
       
       // Check for critical issues
+      // === iOS/LOCATION SPECIFIC ISSUES ===
+      const nonPrimaryIssues = data.locations.filter(e => e.msg.toLowerCase().includes('not primary') || e.msg.toLowerCase().includes('non-primary'));
+      const locationUnavailable = data.locations.filter(e => e.msg.toLowerCase().includes('unavailable') || e.msg.toLowerCase().includes('denied'));
+      const mustVisitSite = data.locations.filter(e => e.msg.toLowerCase().includes('must visit'));
+      const simulatedLocations = data.locations.filter(e => e.msg.toLowerCase().includes('simulated location'));
+      const siteEnters = data.locations.filter(e => e.msg.includes('ENTER'));
+      const siteExits = data.locations.filter(e => e.msg.includes('EXIT'));
+      const autoStartEvents = data.locations.filter(e => e.msg.toLowerCase().includes('auto-start'));
+      const autoStopEvents = data.locations.filter(e => e.msg.toLowerCase().includes('auto-stop'));
+      
+      if (nonPrimaryIssues.length > 0) {
+        findings.push({
+          severity: 'warning', icon: '📱', title: 'Non-Primary Device Issues',
+          description: `Found ${nonPrimaryIssues.length} event${nonPrimaryIssues.length > 1 ? 's' : ''} where actions were blocked because this isn't the primary device. <strong>Only the primary device can record locations and trigger job site automations.</strong>`,
+          action: 'Have the user tap the "Make Primary" banner on the Timer screen, or check which device is primary in Admin → User → Primary Device.',
+          techDetail: nonPrimaryIssues.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      if (locationUnavailable.length > 0) {
+        findings.push({
+          severity: 'critical', icon: '📍', title: 'Location Unavailable',
+          description: `Found ${locationUnavailable.length} event${locationUnavailable.length > 1 ? 's' : ''} where location was unavailable. This prevents job site features and may block tracking if "Restrict timer to job sites" is enabled.`,
+          action: '<strong>iOS:</strong> Settings → Privacy & Security → Location Services → ON, then Settings → Hubstaff → Location → Always + Precise Location ON. <strong>Android:</strong> Enable location permission with "Allow all the time" + High Accuracy mode.',
+          techDetail: locationUnavailable.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      if (mustVisitSite.length > 0) {
+        findings.push({
+          severity: 'critical', icon: '🚫', title: 'Timer Blocked - Not At Job Site',
+          description: `Found ${mustVisitSite.length} attempt${mustVisitSite.length > 1 ? 's' : ''} to start the timer that were blocked because the user wasn't at a job site. The organization has "Restrict timer to job sites" enabled.`,
+          action: 'User must be physically at a configured job site to start tracking. If they ARE at the site, this could be a GPS accuracy issue - consider increasing the job site radius to 100-150m.',
+          techDetail: mustVisitSite.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      if (simulatedLocations.length > 0) {
+        findings.push({
+          severity: 'critical', icon: '🚫', title: 'Fake/Simulated Locations Detected',
+          description: `Found ${simulatedLocations.length} simulated (fake) location${simulatedLocations.length > 1 ? 's' : ''} that were blocked. The user may be using a GPS spoofing app.`,
+          action: 'Hubstaff blocks fake locations. If legitimate, user may have a developer/mock location app enabled that needs to be disabled.',
+          techDetail: simulatedLocations.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
+        });
+      }
+      
+      if (siteEnters.length > 0 || siteExits.length > 0) {
+        let siteDesc = '';
+        if (siteEnters.length > 0) siteDesc += `${siteEnters.length} site entry event${siteEnters.length > 1 ? 's' : ''}`;
+        if (siteEnters.length > 0 && siteExits.length > 0) siteDesc += ' and ';
+        if (siteExits.length > 0) siteDesc += `${siteExits.length} site exit event${siteExits.length > 1 ? 's' : ''}`;
+        const autoActions = autoStartEvents.length + autoStopEvents.length;
+        if (autoActions > 0) siteDesc += `. ${autoActions} automation action${autoActions > 1 ? 's' : ''} triggered.`;
+        findings.push({ severity: 'success', icon: '📍', title: 'Job Site Activity Detected', description: siteDesc, action: null, techDetail: null });
+      }
       const watchdogHits = data.errors.filter(e => e.msg.toLowerCase().includes('watchdog'));
       if (watchdogHits.length > 0) {
         findings.push({
@@ -1468,8 +1624,8 @@
           data.network.push(entry);
         }
 
-        // Locations
-        if (line.includes('feed: sites') || line.includes('LocationFeatureState') || line.includes('LocationManager') || line.includes('geofence') || line.includes('Geofence') || line.includes('Job Site')) {
+        // Locations (expanded for iOS/Android location issues)
+        if (line.includes('feed: sites') || line.includes('LocationFeatureState') || line.includes('LocationManager') || line.includes('geofence') || line.includes('Geofence') || line.includes('Job Site') || line.includes('[Site]') || line.includes('[Position]') || line.includes('[LocationRequest]') || line.includes('[LocationResolution]') || line.includes('primary device') || line.includes('Primary changed') || (line.toLowerCase().includes('location') && (line.includes('permission') || line.includes('unavailable') || line.includes('denied')))) {
           data.locations.push(entry);
         }
 
