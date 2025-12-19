@@ -1355,6 +1355,22 @@
           techDetail: locationDenied.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,100)}`).join('\n')
         });
       }
+
+      // === BRAVE BROWSER CHECK ===
+      const braveUsage = data.apps.filter(e => 
+        (e.extractedApp && e.extractedApp.toLowerCase().includes('brave')) ||
+        (e.raw && e.raw.toLowerCase().includes('brave'))
+      );
+      if (braveUsage.length > 0) {
+        findings.push({
+          severity: 'warning',
+          icon: '🦁',
+          title: 'Brave Browser Detected - URL Tracking Not Supported',
+          description: `Found ${braveUsage.length} instance${braveUsage.length > 1 ? 's' : ''} of Brave Browser usage. <strong>Brave Browser does not support URL tracking.</strong> The app name will be tracked, but visited URLs will not appear in reports.`,
+          action: 'For URL tracking on Windows, the user should switch to a supported browser: Google Chrome, Microsoft Edge, Firefox, or Island Browser.',
+          techDetail: braveUsage.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.extractedApp || 'Brave Browser'}`).join('\n')
+        });
+      }
       
       // Positive findings
       if (data.screenshots.length > 0 && !data.screenshots.some(e => e.msg.toLowerCase().includes('fail') || e.msg.toLowerCase().includes('error'))) {
@@ -1997,12 +2013,16 @@ $('appsBody').innerHTML = data.apps.slice(0, 100).map(e => {
     return '';
   }
   
+  // Check for Brave Browser - URL tracking not supported
+  const isBrave = content.toLowerCase().includes('brave');
+  const braveWarning = isBrave ? ' <span class="tag warn" title="Brave Browser does not support URL tracking. Consider using Chrome, Edge, Firefox, or Island Browser instead." style="cursor:help;">⚠️ No URL tracking</span>' : '';
+  
   const tagClass = type === 'URL' ? 'info' : type === 'Title' ? 'audit' : 'success';
   
   return `
     <tr>
       <td>${fmtTime(e.ts)}</td>
-      <td><span class="tag ${tagClass}">${type}</span></td>
+      <td><span class="tag ${tagClass}">${type}</span>${braveWarning}</td>
       <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(content)}">${escapeHtml(content)}</td>
     </tr>
   `;
