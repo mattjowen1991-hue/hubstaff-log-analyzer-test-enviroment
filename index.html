@@ -1534,8 +1534,10 @@
           if (tz) data.timezone = tz;
         }
 
-        if (!showDebug && level === 'DEBUG') continue;
-        if (!showTrace && level === 'TRACE') continue;
+        // Skip DEBUG/TRACE unless enabled, BUT always process ApplicationGrabber URL lines
+const isAppGrabberUrl = line.includes('ApplicationGrabber') && line.includes('URL:');
+if (!showDebug && level === 'DEBUG' && !isAppGrabberUrl) continue;
+if (!showTrace && level === 'TRACE') continue;
 
         const entry = { ts, level, src, msg, raw: line };
 
@@ -1629,10 +1631,38 @@
           data.locations.push(entry);
         }
 
-        // Apps & URLs
-        if (line.includes('URL:') || line.includes('TITLE:') || line.includes('APP:') || line.includes('ApplicationGrabber')) {
-          data.apps.push(entry);
-        }
+        // Apps & URLs - improved to handle multi-line URL/TITLE format
+// Check if it's an ApplicationGrabber line with actual URL content
+if (line.includes('ApplicationGrabber') && line.includes('URL:')) {
+  const urlMatch = line.match(/URL:\s*(\S+)/);
+  if (urlMatch && urlMatch[1]) {
+    entry.extractedUrl = urlMatch[1];
+    entry.extractedType = 'URL';
+    data.apps.push(entry);
+  }
+}
+// Skip standalone "TITLE:" lines that are empty or only whitespace
+else if (line.match(/^TITLE:\s*$/) || line.match(/^\s*TITLE:\s*$/)) {
+  // Skip empty TITLE lines - these are noise
+}
+// Capture TITLE lines that actually have content
+else if (line.includes('TITLE:') && line.match(/TITLE:\s*\S+/)) {
+  const titleMatch = line.match(/TITLE:\s*(.+)/);
+  if (titleMatch && titleMatch[1].trim()) {
+    entry.extractedTitle = titleMatch[1].trim();
+    entry.extractedType = 'Title';
+    data.apps.push(entry);
+  }
+}
+// APP: lines
+else if (line.includes('APP:')) {
+  const appMatch = line.match(/APP:\s*(.+)/);
+  if (appMatch && appMatch[1].trim()) {
+    entry.extractedApp = appMatch[1].trim();
+    entry.extractedType = 'App';
+    data.apps.push(entry);
+  }
+}
 
         // Tracking events
         if (line.includes('Resume') || line.includes('Idle') || line.includes('Discard=') || line.includes('Startup') || line.includes('START_TRACKING') || line.includes('STOP_TRACKING')) {
@@ -1904,18 +1934,59 @@
       `).join('') || '<tr><td colspan="3" style="color:var(--muted)">No location events found</td></tr>';
 
       // Apps
-      $('appsBody').innerHTML = data.apps.slice(0, 50).map(e => {
-        let type = 'App';
-        if (e.msg.includes('URL:')) type = 'URL';
-        else if (e.msg.includes('TITLE:')) type = 'Title';
-        return `
-          <tr>
-            <td>${fmtTime(e.ts)}</td>
-            <td><span class="tag info">${type}</span></td>
-            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
-          </tr>
-        `;
-      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No app/URL events found</td></tr>';
+$('appsBody').innerHTML = data.apps.slice(0, 100).map(e => {
+  let type = e.extractedType || 'App';
+  let content = '';
+  
+  if (e.extractedUrl) {
+    content = e.extractedUrl;
+  } else if (e.extractedTitle) {
+    content = e.extractedTitle;
+  } else if (e.extractedApp) {
+    content = e.extractedApp;
+  } else {
+    // Fallback: try to extract from raw line
+    const urlMatch = e.raw.match(/URL:\s*(\S+)/);
+    const titleMatch = e.raw.match(/TITLE:\s*(.+)/);
+    const appMatch = e.raw.match(/APP:\s*(.+)/);
+    
+    if (urlMatch && urlMatch[1]) {
+      type = 'URL';
+      content = urlMatch[1];
+    } else if (titleMatch && titleMatch[1].trim()) {
+      type = 'Title';
+      content = titleMatch[1].trim();
+    } else if (appMatch && appMatch[1].trim()) {
+      type = 'App';
+      content = appMatch[1].trim();
+    } else {
+      content = e.msg;
+    }
+  }
+  
+  // Skip if no meaningful content
+  if (!content || content === 'TITLE:' || content.trim() === '') {
+    return '';
+  }
+  
+  const tagClass = type === 'URL' ? 'info' : type === 'Title' ? 'audit' : 'success';
+  
+  return `
+    <tr>
+      <td>${fmtTime(e.ts)}</td>
+      <td><span class="tag ${tagClass}">${type}</span></td>
+      <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(content)}">${escapeHtml(content)}</td>
+    </tr>
+  `;
+}).filter(row => row !== '').join('') || '<tr><td colspan="3" style="color:var(--muted)">No app/URL events found</td></tr>';
+
+// Update apps count to reflect actual valid entries (excluding empty ones)
+const actualAppsCount = data.apps.filter(e => {
+  if (e.extractedUrl || e.extractedTitle || e.extractedApp) return true;
+  const urlMatch = e.raw.match(/URL:\s*(\S+)/);
+  return urlMatch && urlMatch[1];
+}).length;
+$('appsCount').textContent = actualAppsCount;
 
       // Injected Input
       $('injectedBody').innerHTML = data.injected.slice(0, 100).map(e => {
