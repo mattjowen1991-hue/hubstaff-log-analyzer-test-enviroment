@@ -1372,7 +1372,7 @@ const braveInLogs = allLines.some(line =>
     severity: 'warning',
     icon: '🦁',
     title: 'Brave Browser Detected - URL Tracking Not Supported',
-    description: `Brave Browser usage detected in logs. <strong>Brave Browser does not support URL tracking.</strong> The app name will be tracked, but visited URLs will not appear in reports.`,
+    description: `Brave Browser usage detected in logs. <strong>Hubstaff does not support URL tracking in Brave Browser.</strong> The app name will be tracked, but visited URLs will not appear in reports.`,
     action: 'For URL tracking on Windows, the user should switch to a supported browser: Google Chrome, Microsoft Edge, Firefox, or Island Browser.',
     techDetail: braveUsage.length > 0 ? braveUsage.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.extractedApp || 'Brave Browser'}`).join('\n') : 'Detected in PutApplications block'
   });
