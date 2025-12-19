@@ -1534,9 +1534,10 @@
           if (tz) data.timezone = tz;
         }
 
-        // Skip DEBUG/TRACE unless enabled, BUT always process ApplicationGrabber URL lines
+        // Skip DEBUG/TRACE unless enabled, BUT always process ApplicationGrabber URL/APP lines
 const isAppGrabberUrl = line.includes('ApplicationGrabber') && line.includes('URL:');
-if (!showDebug && level === 'DEBUG' && !isAppGrabberUrl) continue;
+const isAppActivity = line.includes('Switched to app') || line.includes('for App :') || (line.includes('WindowsGrabber') && line.includes('name:'));
+if (!showDebug && level === 'DEBUG' && !isAppGrabberUrl && !isAppActivity) continue;
 if (!showTrace && level === 'TRACE') continue;
 
         const entry = { ts, level, src, msg, raw: line };
@@ -1654,9 +1655,36 @@ else if (line.includes('TITLE:') && line.match(/TITLE:\s*\S+/)) {
     data.apps.push(entry);
   }
 }
-// APP: lines
+// APP: lines (explicit format)
 else if (line.includes('APP:')) {
   const appMatch = line.match(/APP:\s*(.+)/);
+  if (appMatch && appMatch[1].trim()) {
+    entry.extractedApp = appMatch[1].trim();
+    entry.extractedType = 'App';
+    data.apps.push(entry);
+  }
+}
+// "Switched to app" lines
+else if (line.includes('Switched to app')) {
+  const appMatch = line.match(/Switched to app\s*:\s*(.+?)\s+at\s+\d+/i);
+  if (appMatch && appMatch[1].trim() && !appMatch[1].includes('PII_HIDDEN')) {
+    entry.extractedApp = appMatch[1].trim();
+    entry.extractedType = 'App';
+    data.apps.push(entry);
+  }
+}
+// "Activating URL grabber for App" lines
+else if (line.includes('for App :')) {
+  const appMatch = line.match(/for App\s*:\s*(.+)/i);
+  if (appMatch && appMatch[1].trim()) {
+    entry.extractedApp = appMatch[1].trim();
+    entry.extractedType = 'App';
+    data.apps.push(entry);
+  }
+}
+// WindowsGrabber "name:" lines (captures app name and version)
+else if (line.includes('WindowsGrabber') && line.includes('name:')) {
+  const appMatch = line.match(/name:\s*(.+?)\s+binary:/i);
   if (appMatch && appMatch[1].trim()) {
     entry.extractedApp = appMatch[1].trim();
     entry.extractedType = 'App';
