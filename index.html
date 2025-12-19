@@ -2035,7 +2035,7 @@ $('appsBody').innerHTML = data.apps.slice(0, 100).map(e => {
   
   // Check for Brave Browser - URL tracking not supported
   const isBrave = content.toLowerCase().includes('brave');
-  const braveWarning = isBrave ? ' <span class="tag warn" title="Brave Browser does not support URL tracking. Consider using Chrome, Edge, Firefox, or Island Browser instead." style="cursor:help;">⚠️ No URL tracking</span>' : '';
+  const braveWarning = isBrave ? ' <span class="tag warn" title="Hubstaff does not support URL tracking in Brave Browser. Consider using Chrome, Edge, Firefox, or Island Browser instead." style="cursor:help;">⚠️ No URL tracking</span>' : '';
   
   const tagClass = type === 'URL' ? 'info' : type === 'Title' ? 'audit' : 'success';
   
