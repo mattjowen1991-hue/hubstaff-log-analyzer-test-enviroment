@@ -1357,20 +1357,26 @@
       }
 
       // === BRAVE BROWSER CHECK ===
-      const braveUsage = data.apps.filter(e => 
-        (e.extractedApp && e.extractedApp.toLowerCase().includes('brave')) ||
-        (e.raw && e.raw.toLowerCase().includes('brave'))
-      );
-      if (braveUsage.length > 0) {
-        findings.push({
-          severity: 'warning',
-          icon: '🦁',
-          title: 'Brave Browser Detected - URL Tracking Not Supported',
-          description: `Found ${braveUsage.length} instance${braveUsage.length > 1 ? 's' : ''} of Brave Browser usage. <strong>Brave Browser does not support URL tracking.</strong> The app name will be tracked, but visited URLs will not appear in reports.`,
-          action: 'For URL tracking on Windows, the user should switch to a supported browser: Google Chrome, Microsoft Edge, Firefox, or Island Browser.',
-          techDetail: braveUsage.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.extractedApp || 'Brave Browser'}`).join('\n')
-        });
-      }
+const braveUsage = data.apps.filter(e => 
+  (e.extractedApp && e.extractedApp.toLowerCase().includes('brave')) ||
+  (e.raw && e.raw.toLowerCase().includes('brave')) ||
+  (e.msg && e.msg.toLowerCase().includes('brave'))
+);
+
+// Also check all lines for Brave in PutApplications blocks
+const braveInLogs = allLines.some(line => 
+  line.includes('name') && line.toLowerCase().includes('brave')
+);
+      if (braveUsage.length > 0 || braveInLogs) {
+  findings.push({
+    severity: 'warning',
+    icon: '🦁',
+    title: 'Brave Browser Detected - URL Tracking Not Supported',
+    description: `Brave Browser usage detected in logs. <strong>Brave Browser does not support URL tracking.</strong> The app name will be tracked, but visited URLs will not appear in reports.`,
+    action: 'For URL tracking on Windows, the user should switch to a supported browser: Google Chrome, Microsoft Edge, Firefox, or Island Browser.',
+    techDetail: braveUsage.length > 0 ? braveUsage.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.extractedApp || 'Brave Browser'}`).join('\n') : 'Detected in PutApplications block'
+  });
+}
       
       // Positive findings
       if (data.screenshots.length > 0 && !data.screenshots.some(e => e.msg.toLowerCase().includes('fail') || e.msg.toLowerCase().includes('error'))) {
@@ -1553,7 +1559,8 @@
         // Skip DEBUG/TRACE unless enabled, BUT always process ApplicationGrabber URL/APP lines
 const isAppGrabberUrl = line.includes('ApplicationGrabber') && line.includes('URL:');
 const isAppActivity = line.includes('Switched to app') || line.includes('for App :') || (line.includes('WindowsGrabber') && line.includes('name:'));
-if (!showDebug && level === 'DEBUG' && !isAppGrabberUrl && !isAppActivity) continue;
+const isPutApplications = line.includes('PutApplications');
+if (!showDebug && level === 'DEBUG' && !isAppGrabberUrl && !isAppActivity && !isPutApplications) continue;
 if (!showTrace && level === 'TRACE') continue;
 
         const entry = { ts, level, src, msg, raw: line };
@@ -1705,6 +1712,19 @@ else if (line.includes('WindowsGrabber') && line.includes('name:')) {
     entry.extractedApp = appMatch[1].trim();
     entry.extractedType = 'App';
     data.apps.push(entry);
+  }
+}
+
+        // PutApplications JSON-style blocks - extract app names from name "AppName" or name AppName lines
+else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
+  const appMatch = line.match(/^\s*name\s+["']?(.+?)["']?\s*$/);
+  if (appMatch && appMatch[1].trim()) {
+    const appName = appMatch[1].replace(/["']/g, '').trim();
+    if (appName && appName !== 'applications' && appName !== 'platform') {
+      entry.extractedApp = appName;
+      entry.extractedType = 'App';
+      data.apps.push(entry);
+    }
   }
 }
 
