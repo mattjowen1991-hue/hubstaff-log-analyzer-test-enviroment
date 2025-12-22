@@ -795,9 +795,13 @@
     // === iOS/LOCATION LOG PATTERNS ===
     const LOCATION_PATTERNS = {
       errors: [
+        { pattern: /\[Position\] Couldn't obtain location.*denied.*Code=1/i, meaning: "📍 Location permission DENIED at iOS level", action: "User must go to iOS Settings → Privacy & Security → Location Services → Hubstaff → select 'Always'. The app requested location but iOS blocked it because permission is set to 'Never' or 'While Using'." },
+        { pattern: /\[Position\] Couldn't obtain location.*Code=0/i, meaning: "📍 Location unknown - device couldn't determine position", action: "GPS signal may be weak. Have user try outdoors with clear sky view, or check if Location Services are enabled globally." },
         { pattern: /\[Position\] Couldn't obtain location/i, meaning: "📍 Device cannot access user's location", action: "Check if location services are enabled and permissions are set to 'Always'" },
         { pattern: /\[Site\] Region issue/i, meaning: "📍 Problem monitoring job site region", action: "May affect job site detection. Check location permissions and GPS signal." },
         { pattern: /\[LocationResolution\].*error/i, meaning: "📍 Failed to resolve location name", action: "Geocoding issue - may show coordinates instead of address names." },
+        { pattern: /kCLErrorDomain Code=1/i, meaning: "📍 iOS Location Permission Denied (kCLErrorDomain)", action: "This iOS error means location permission is denied. Go to Settings → Hubstaff → Location → 'Always'." },
+        { pattern: /kCLErrorDomain Code=0/i, meaning: "📍 iOS Location Unknown (kCLErrorDomain)", action: "iOS couldn't determine location. Check GPS signal, try outdoors, ensure Location Services are ON globally." },
       ],
       audit: [
         { pattern: /Locations needed but non-primary device/i, meaning: "📱 Can't track - this isn't the primary device", action: "User needs to tap the banner to make this device primary, or use their primary device." },
@@ -830,6 +834,15 @@
         { pattern: /Location Availability changed/i, meaning: "📍 Location availability changed", action: null },
         { pattern: /Recording changed/i, meaning: "📍 Location recording state changed", action: null },
         { pattern: /AccuracyLimited changed/i, meaning: "🔋 Location accuracy limited (low power/hot device)", action: null },
+      ],
+      // iOS-specific permission states
+      permissions: [
+        { pattern: /device_locations=undetermined/i, meaning: "📍 Location permission NOT YET REQUESTED", action: "User hasn't been prompted for location permission yet. They need to open the app and respond to the permission prompt, or go to Settings → Hubstaff → Location → 'Always'." },
+        { pattern: /device_locations=denied/i, meaning: "📍 Location permission DENIED", action: "User denied location permission. Go to iOS Settings → Privacy & Security → Location Services → Hubstaff → select 'Always'." },
+        { pattern: /device_locations=restricted/i, meaning: "📍 Location permission RESTRICTED", action: "Location is restricted by device management (MDM) or parental controls. Contact IT admin to allow location access for Hubstaff." },
+        { pattern: /device_locations=authorizedWhenInUse/i, meaning: "📍 Location set to 'While Using' - NOT SUFFICIENT", action: "Location is set to 'While Using App' which won't work for background tracking. User must change to 'Always' in iOS Settings → Hubstaff → Location." },
+        { pattern: /device_locations=authorizedAlways/i, meaning: "📍 Location permission correctly set to 'Always'", action: null },
+        { pattern: /status=notDetermined/i, meaning: "📍 iOS location permission not yet determined", action: "User needs to respond to the location permission prompt, or manually enable in Settings → Hubstaff → Location → 'Always'." },
       ]
     };
 
@@ -838,7 +851,7 @@
       for (const p of patterns) {
         if (p.pattern.test(msg)) return { text: p.meaning, action: p.action };
       }
-      for (const lvl of ['errors', 'audit', 'info', 'trace']) {
+      for (const lvl of ['errors', 'audit', 'info', 'trace', 'permissions']) {
         for (const p of LOCATION_PATTERNS[lvl] || []) {
           if (p.pattern.test(msg)) return { text: p.meaning, action: p.action };
         }
@@ -1178,6 +1191,109 @@
           description: `User's computer timezone offset detected from logs.`,
           action: null,
           techDetail: null
+        });
+      }
+
+      // === APP VERSION CHECK ===
+      const versionLine = allLines.find(line => line.includes('Version') && line.includes('2.2.'));
+      if (versionLine) {
+        const versionMatch = versionLine.match(/(\d+\.\d+\.\d+)/);
+        if (versionMatch) {
+          const version = versionMatch[1];
+          // Known problematic versions
+          if (version === '2.2.68') {
+            findings.push({
+              severity: 'critical',
+              icon: '📱',
+              title: 'Problematic App Version Detected: 2.2.68',
+              description: `App version <strong>2.2.68</strong> has a known bug that causes locations to temporarily stop uploading. This version was identified by the development team as problematic.`,
+              action: 'Have the user update to the latest version of Hubstaff from the App Store immediately. This is likely the cause of missing location data.',
+              techDetail: versionLine.slice(0, 150)
+            });
+          } else {
+            findings.push({
+              severity: 'info',
+              icon: '📱',
+              title: `App Version: ${version}`,
+              description: `Detected Hubstaff app version from logs.`,
+              action: null,
+              techDetail: null
+            });
+          }
+        }
+      }
+
+      // === iOS PERMISSION STATUS CHECK ===
+      const permissionLine = allLines.find(line => line.includes('SESSION:') && line.includes('device_locations='));
+      if (permissionLine) {
+        const locPermMatch = permissionLine.match(/device_locations=(\w+)/);
+        if (locPermMatch) {
+          const permStatus = locPermMatch[1];
+          if (permStatus === 'undetermined') {
+            findings.push({
+              severity: 'critical',
+              icon: '📍',
+              title: 'Location Permission Not Yet Granted',
+              description: `iOS location permission is <strong>undetermined</strong> - the user has not yet responded to the location permission prompt or it was never shown.`,
+              action: 'User needs to: 1) Open Hubstaff app and approve location prompt if shown, OR 2) Go to iOS Settings → Privacy & Security → Location Services → Hubstaff → select "Always" and enable "Precise Location".',
+              techDetail: permissionLine
+            });
+          } else if (permStatus === 'denied') {
+            findings.push({
+              severity: 'critical',
+              icon: '🚫',
+              title: 'Location Permission Denied',
+              description: `iOS location permission is <strong>denied</strong>. The app cannot access location at all.`,
+              action: 'User must go to iOS Settings → Privacy & Security → Location Services → Hubstaff → select "Always". They may have accidentally denied the prompt.',
+              techDetail: permissionLine
+            });
+          } else if (permStatus === 'restricted') {
+            findings.push({
+              severity: 'critical',
+              icon: '🔒',
+              title: 'Location Permission Restricted',
+              description: `iOS location permission is <strong>restricted</strong> by device management (MDM) or parental controls.`,
+              action: 'Contact the IT administrator who manages this device. They need to allow location access for Hubstaff in the MDM profile.',
+              techDetail: permissionLine
+            });
+          } else if (permStatus === 'authorizedWhenInUse') {
+            findings.push({
+              severity: 'warning',
+              icon: '⚠️',
+              title: 'Location Set to "While Using" - Insufficient',
+              description: `iOS location permission is set to <strong>"While Using App"</strong>. This is NOT sufficient for background location tracking. Locations will only be recorded while the app is open and on screen.`,
+              action: 'User must go to iOS Settings → Hubstaff → Location → change from "While Using the App" to "Always". Background tracking requires "Always" permission.',
+              techDetail: permissionLine
+            });
+          }
+        }
+      }
+
+      // === iOS LOCATION ERROR CHECK ===
+      const locationDeniedError = allLines.find(line => line.includes('kCLErrorDomain Code=1') || (line.includes('[Position]') && line.includes('denied')));
+      if (locationDeniedError && !findings.some(f => f.title.includes('Permission Denied'))) {
+        findings.push({
+          severity: 'critical',
+          icon: '🚫',
+          title: 'iOS Blocked Location Request',
+          description: `Found iOS error <strong>kCLErrorDomain Code=1</strong> which means iOS actively denied a location request. Even if the app has internal consent, iOS is blocking location access.`,
+          action: 'This is the smoking gun! User must change iOS location permission: Settings → Privacy & Security → Location Services → Hubstaff → "Always".',
+          techDetail: locationDeniedError.slice(0, 200)
+        });
+      }
+
+      // === PERMISSION MISMATCH CHECK ===
+      const appConsentsLocation = allLines.find(line => line.includes('consents') && line.includes('locations') && line.includes('true'));
+      const iosLocationDenied = allLines.some(line => line.includes('device_locations=denied') || line.includes('device_locations=undetermined') || (line.includes('kCLErrorDomain') && line.includes('Code=1')));
+      
+      if (appConsentsLocation && iosLocationDenied) {
+        findings.push({
+          severity: 'critical',
+          icon: '🔀',
+          title: 'Permission Mismatch Detected',
+          description: `The Hubstaff app has location consent enabled (<code>consents.locations: true</code>), but iOS is blocking location access. The user agreed to tracking in the app but iOS permissions are wrong.`,
+          action: 'This explains the issue! The app thinks it has permission but iOS disagrees. Fix: iOS Settings → Privacy & Security → Location Services → Hubstaff → "Always".',
+          techDetail: 'App consent: ' + (appConsentsLocation ? appConsentsLocation.slice(0, 100) : 'found')
         });
       }
 
