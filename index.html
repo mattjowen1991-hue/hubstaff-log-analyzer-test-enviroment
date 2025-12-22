@@ -284,7 +284,7 @@
 
     .timeline-time-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); margin-top: 8px; padding: 0 4px; }
 
-    .info-box { position: fixed; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 14px; z-index: 1000; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.6); min-width: 220px; max-width: 350px; }
+    .info-box { position: absolute; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 14px; z-index: 1000; display: none; box-shadow: 0 10px 40px rgba(0,0,0,0.6); min-width: 220px; max-width: 350px; }
     .info-box h4 { color: var(--accent); font-size: 13px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
     .info-box p { font-size: 12px; color: var(--text); margin: 4px 0; line-height: 1.5; }
     .info-box .label { color: var(--muted); }
@@ -1416,12 +1416,19 @@ const braveInLogs = allLines.some(line =>
       box.style.display = 'block';
 
       const rect = box.getBoundingClientRect();
-      let top = e.clientY - rect.height - 15;
-      let left = e.clientX - rect.width / 2;
+      // Use pageX/pageY to account for scroll position
+      let top = e.pageY - rect.height - 15;
+      let left = e.pageX - rect.width / 2;
       
-      if (top < 10) top = e.clientY + 15;
-      if (left < 10) left = 10;
-      if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
+      // Keep within viewport bounds (using scroll-adjusted values)
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      
+      if (top < scrollTop + 10) top = e.pageY + 15;
+      if (left < scrollLeft + 10) left = scrollLeft + 10;
+      if (left + rect.width > scrollLeft + window.innerWidth - 10) {
+        left = scrollLeft + window.innerWidth - rect.width - 10;
+      }
 
       box.style.top = top + 'px';
       box.style.left = left + 'px';
