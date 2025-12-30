@@ -732,8 +732,8 @@
       </div>
       <textarea id="logInput" placeholder="Paste raw hubstaff.log contents here - noise will be filtered automatically..."></textarea>
       <div class="toggle-row">
-        <label><input type="checkbox" id="autoFilter" checked> Auto-filter noise</label>
-        <label><input type="checkbox" id="plainMode" checked> 🎯 Plain English mode</label>
+  <label class="has-tooltip"><input type="checkbox" id="autoFilter" checked> Auto-filter noise<span class="tooltip">Removes routine log lines (mouse coordinates, heartbeats, successful API calls) that don't help diagnose issues. Keeps errors, warnings, screenshots, and tracking events. Disable if you need to see every raw log line.</span></label>
+  <label class="has-tooltip"><input type="checkbox" id="plainMode" checked> 🎯 Plain English mode<span class="tooltip">Translates technical log messages into plain English explanations with actionable advice. Shows the Root Cause Analysis box and Quick Summary. Disable for raw technical view.</span></label>
         <label class="has-tooltip"><input type="checkbox" id="showDebug"> Show DEBUG level<span class="tooltip">DEBUG logs show detailed app operations like API calls, file reads, and internal processes. Usually only needed for deep technical investigation.</span></label>
         <label class="has-tooltip"><input type="checkbox" id="showTrace"> Show TRACE level<span class="tooltip">TRACE logs show very granular details like every mouse movement and keystroke. Creates a lot of noise - only enable if specifically needed.</span></label>
         <span class="help-link" id="helpBtn">Help & Info</span>
