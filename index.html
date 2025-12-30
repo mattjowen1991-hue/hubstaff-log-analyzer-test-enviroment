@@ -300,6 +300,143 @@
     .summary-item .action { font-size: 11px; color: var(--link); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
     .summary-item .tech-detail { font-size: 10px; color: #666; font-family: monospace; margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px; display: none; }
     .summary-item .tech-detail.visible { display: block; }
+    /* Device Status Dashboard Styles */
+    .device-dashboard {
+      background: linear-gradient(135deg, var(--panel) 0%, #1a1028 100%);
+      border: 1px solid var(--accent-dim);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .dashboard-user-info h3 {
+      color: var(--link);
+      font-size: 16px;
+      margin: 0 0 4px 0;
+    }
+    .dashboard-user-info p {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 2px 0;
+    }
+    .dashboard-device-info {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .dashboard-device-info .device-model {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .dashboard-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .dashboard-card h4 {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin: 0 0 10px 0;
+      font-weight: 600;
+    }
+    .dashboard-card .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      margin: 6px 0;
+    }
+    .dashboard-card .status-icon { font-size: 14px; }
+    .dashboard-card .status-icon.success { color: var(--success); }
+    .dashboard-card .status-icon.warning { color: var(--warn); }
+    .dashboard-card .status-icon.error { color: var(--danger); }
+    .dashboard-card .status-label { color: var(--text); }
+    .dashboard-card .status-value { color: var(--muted); margin-left: auto; font-size: 11px; }
+    
+    /* Root Cause Conclusion Styles */
+    .root-cause-box {
+      background: linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(245,158,11,0.1) 100%);
+      border: 2px solid var(--warn);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .root-cause-box.success {
+      background: linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.1) 100%);
+      border-color: var(--success);
+    }
+    .root-cause-box h3 {
+      color: var(--warn);
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .root-cause-box.success h3 { color: var(--success); }
+    .root-cause-box .conclusion {
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .root-cause-box .conclusion strong {
+      color: var(--link);
+    }
+    .root-cause-box .evidence {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .root-cause-box .evidence h4 {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 8px 0;
+    }
+    .root-cause-box .evidence ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .root-cause-box .evidence li {
+      margin: 4px 0;
+    }
+    .root-cause-box .action-steps {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+    }
+    .root-cause-box .action-steps h4 {
+      font-size: 12px;
+      color: var(--success);
+      margin: 0 0 8px 0;
+    }
+    .root-cause-box .action-steps ol {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .root-cause-box .action-steps li {
+      margin: 4px 0;
+    }
     .summary-item .show-tech { font-size: 10px; color: var(--muted); cursor: pointer; text-decoration: underline; margin-left: 8px; }
 
     .plain-explanation { font-size: 11px; color: var(--accent); margin-top: 4px; padding: 6px 10px; background: rgba(168,85,247,0.1); border-radius: 4px; border-left: 2px solid var(--accent); }
@@ -408,6 +545,10 @@
       <div class="kpi"><div class="kpi-label">Timezone</div><div class="kpi-value" id="kpiTimezone">--</div></div>
       <div class="kpi"><div class="kpi-label">Log Time Span</div><div class="kpi-value" id="kpiTimeSpan">--</div></div>
     </div>
+
+    <div id="rootCauseCard" style="display:none;"></div>
+    
+    <div id="deviceDashboard" style="display:none;"></div>
 
     <div class="card" id="summaryCard" style="display:none; border-left: 3px solid var(--accent);">
       <div class="section-title"><span>📋</span> Quick Summary for Support</div>
@@ -760,7 +901,21 @@
       <ul>
         <li><strong>Location Permission:</strong> Settings → Apps → Hubstaff → Permissions → Location → "Allow all the time"</li>
         <li><strong>Location Mode:</strong> Enable "High accuracy" mode (GPS + Network)</li>
-        <li><strong>Battery Optimization:</strong> Exclude Hubstaff from battery optimization/Doze</li>
+        <li><strong>Battery Optimization:</strong> Settings → Apps → Hubstaff → Battery → "Unrestricted"</li>
+      </ul>
+      <p><strong>Brand-specific battery settings (CRITICAL):</strong></p>
+      <ul>
+        <li><strong>Samsung:</strong> Device Care → Battery → App power management → Hubstaff → Unrestricted. Also check "Sleeping apps" and "Deep sleeping apps" lists - remove Hubstaff from both.</li>
+        <li><strong>Xiaomi/MIUI:</strong> Settings → Apps → Manage Apps → Hubstaff → Autostart ON, and Settings → Battery → Hubstaff → No restrictions</li>
+        <li><strong>Huawei:</strong> Settings → Battery → App Launch → Hubstaff → Manually Manage with all toggles ON</li>
+        <li><strong>OnePlus:</strong> Settings → Battery → Battery Optimization → Hubstaff → Don't optimize</li>
+        <li><strong>OPPO/Realme:</strong> Settings → App Management → Hubstaff → Allow Auto-start + disable battery optimization</li>
+      </ul>
+      <p><strong>Common Android Issues:</strong></p>
+      <ul>
+        <li><strong>"Timer could not be started":</strong> User is not at a job site but organization requires it. Check GPS signal and job site radius settings.</li>
+        <li><strong>App keeps closing:</strong> Battery optimization is killing the app. Follow brand-specific steps above.</li>
+        <li><strong>No data syncing:</strong> Check internet connection. Try switching between WiFi and mobile data.</li>
       </ul>
 
       <h3>Primary Device</h3>
@@ -802,6 +957,12 @@
         { pattern: /\[LocationResolution\].*error/i, meaning: "📍 Failed to resolve location name", action: "Geocoding issue - may show coordinates instead of address names." },
         { pattern: /kCLErrorDomain Code=1/i, meaning: "📍 iOS Location Permission Denied (kCLErrorDomain)", action: "This iOS error means location permission is denied. Go to Settings → Hubstaff → Location → 'Always'." },
         { pattern: /kCLErrorDomain Code=0/i, meaning: "📍 iOS Location Unknown (kCLErrorDomain)", action: "iOS couldn't determine location. Check GPS signal, try outdoors, ensure Location Services are ON globally." },
+        // Android network/DNS errors
+        { pattern: /Could not resolve host/i, meaning: "🌐 DNS Resolution Failed - No Internet", action: "Device cannot reach Hubstaff servers. Check: WiFi/mobile data is ON, airplane mode is OFF, try switching networks." },
+        { pattern: /Network Error.*code=6/i, meaning: "🌐 Network Error Code 6 - Cannot Resolve DNS", action: "Device has no working internet connection. Network/WiFi may be connected but not working." },
+        { pattern: /UnknownHostException/i, meaning: "🌐 Java DNS Error - No Internet", action: "Android cannot resolve server addresses. Check internet connectivity." },
+        { pattern: /Unable to update the tokens/i, meaning: "🔐 Token Refresh Failed - Network Issue", action: "Could not refresh login session. Usually caused by no internet connection." },
+        { pattern: /failed to request current location.*cancelled/i, meaning: "📍 Location Request Cancelled", action: "Location update was cancelled. May be due to app being backgrounded or permission issue." },
       ],
       audit: [
         { pattern: /Locations needed but non-primary device/i, meaning: "📱 Can't track - this isn't the primary device", action: "User needs to tap the banner to make this device primary, or use their primary device." },
@@ -819,6 +980,14 @@
         { pattern: /DID NOT auto-stop.*is tracking project/i, meaning: "ℹ️ Job site didn't auto-stop - tracking different project", action: "Normal - only stops if tracking the site's configured project." },
         { pattern: /WILL NOT auto-stop.*not primary/i, meaning: "📱 Job site won't auto-stop - not primary device", action: "User needs to make this device primary." },
         { pattern: /notify reminder/i, meaning: "🔔 Sent reminder notification to user", action: null },
+        // Android tracking blocked events
+        { pattern: /TRACKING_NOT_STARTED.*requires being at a job site/i, meaning: "🚫 Timer Blocked - Not At Required Job Site", action: "User tried to start timer but is not at a configured job site. Organization has 'Restrict timer to job sites' enabled." },
+        { pattern: /Timer could not be started.*requires being at a job site/i, meaning: "🚫 Timer Blocked - Job Site Restriction", action: "The organization requires users to be physically at a job site to start tracking. User is not at any configured site." },
+        // Android startup events
+        { pattern: /STARTUP_UNCLEAN/i, meaning: "⚠️ App crashed or was force-closed last time", action: "The app didn't shut down properly. May have lost unsaved data. Check if user force-closed it or if Android killed it." },
+        { pattern: /STARTUP_CLEAN/i, meaning: "✅ App started normally after clean shutdown", action: null },
+        { pattern: /\(FOREGROUNDED\)/i, meaning: "📱 App brought to foreground", action: null },
+        { pattern: /\(BACKGROUNDED\)/i, meaning: "📱 App sent to background", action: null },
       ],
       info: [
         { pattern: /\[LocationRequest\].*not the user's primary device/i, meaning: "📱 Location request ignored - not primary device", action: "Only the primary device reports locations." },
@@ -828,6 +997,20 @@
         { pattern: /\[Site\] REGION STOP/i, meaning: "📍 Stopped monitoring a job site region", action: null },
         { pattern: /\[Site\] REGION START/i, meaning: "📍 Started monitoring a job site region", action: null },
         { pattern: /suspicious movement/i, meaning: "🚗 Fast movement detected - rechecking job sites", action: "User may be driving away from site." },
+        // Android permission and status patterns
+        { pattern: /permission state is State.*BACKGROUND_LOCATION.*enabled=false/i, meaning: "⚠️ Android Background Location Permission DENIED", action: "User must enable 'Allow all the time' for location: Settings → Apps → Hubstaff → Permissions → Location." },
+        { pattern: /permission state is State.*BACKGROUND_LOCATION.*enabled=true/i, meaning: "✅ Android Background Location Granted", action: null },
+        { pattern: /locationState is \[SERVICES_ENABLED, PERMISSIONS_ENABLED, ACCURACY_ENABLED\]/i, meaning: "✅ Android Location Services Fully Enabled", action: null },
+        { pattern: /isIgnoringBatteryOptimization.*=false/i, meaning: "🔋 Battery Optimization ENABLED - May Kill App", action: "Disable battery optimization: Settings → Apps → Hubstaff → Battery → Unrestricted" },
+        { pattern: /isIgnoringBatteryOptimization.*=true/i, meaning: "✅ Battery Optimization Correctly Disabled", action: null },
+        // Android geofence events
+        { pattern: /handling geofence event.*transitionType=ENTER/i, meaning: "📍 Entered Geofence Area", action: null },
+        { pattern: /handling geofence event.*transitionType=EXIT/i, meaning: "📍 Exited Geofence Area", action: null },
+        { pattern: /updated \d+ geofences succesfully/i, meaning: "✅ Job Site Geofences Registered", action: null },
+        { pattern: /sites count:.*wrappers count:/i, meaning: "📍 Job Sites Loaded", action: null },
+        // Android motion detection
+        { pattern: /motion event.*VEHICLE/i, meaning: "🚗 Driving Activity Detected", action: null },
+        { pattern: /motion event.*STILL/i, meaning: "🧍 Stationary Activity Detected", action: null },
       ],
       trace: [
         { pattern: /Primary changed/i, meaning: "📱 Primary device status changed", action: null },
@@ -1081,6 +1264,368 @@
       return null;
     }
 
+    // === DEVICE STATUS DASHBOARD GENERATION ===
+    function generateDeviceDashboard(data) {
+      // Extract user info
+      const userPropsLine = allLines.find(line => line.includes('user_id=') && line.includes('user_name='));
+      let userId = null, userName = null, userEmail = null, orgName = null, orgId = null;
+      
+      if (userPropsLine) {
+        const userIdMatch = userPropsLine.match(/user_id=(\d+)/);
+        const userNameMatch = userPropsLine.match(/user_name=([^,}]+)/);
+        const userEmailMatch = userPropsLine.match(/user_email=([^,}]+)/);
+        const orgNameMatch = userPropsLine.match(/organization_name=([^,}]+)/);
+        const orgIdMatch = userPropsLine.match(/organization_id=(\d+)/);
+        
+        if (userIdMatch) userId = userIdMatch[1];
+        if (userNameMatch) userName = userNameMatch[1];
+        if (userEmailMatch) userEmail = userEmailMatch[1];
+        if (orgNameMatch) orgName = orgNameMatch[1];
+        if (orgIdMatch) orgId = orgIdMatch[1];
+      }
+      
+      // Extract device info
+      const deviceLine = allLines.find(line => line.includes('device manufacturer'));
+      let manufacturer = null, model = null, osVersion = null;
+      
+      if (deviceLine) {
+        const mfgMatch = deviceLine.match(/manufacturer\s*:\s*(\w+)/i);
+        const modelMatch = deviceLine.match(/model:\s*([\w-]+)/i);
+        const osMatch = deviceLine.match(/OS:\s*(\d+)/i);
+        if (mfgMatch) manufacturer = mfgMatch[1];
+        if (modelMatch) model = modelMatch[1];
+        if (osMatch) osVersion = osMatch[1];
+      }
+      
+      // Extract location state
+      const locationStateLine = allLines.find(line => line.includes('locationState is'));
+      let servicesEnabled = false, permissionsEnabled = false, accuracyEnabled = false, locationEnabled = false;
+      
+      if (locationStateLine) {
+        servicesEnabled = locationStateLine.includes('SERVICES_ENABLED');
+        permissionsEnabled = locationStateLine.includes('PERMISSIONS_ENABLED');
+        accuracyEnabled = locationStateLine.includes('ACCURACY_ENABLED');
+        locationEnabled = locationStateLine.includes('locationEnabled = true');
+      }
+      
+      // Extract primary device status
+      const primaryLine = allLines.find(line => line.includes('primary:'));
+      let isPrimary = null;
+      if (primaryLine) {
+        isPrimary = primaryLine.includes('primary: true');
+      }
+      
+      // Extract permission states
+      const permStateLine = allLines.find(line => line.includes('permission state is State'));
+      let notificationPerm = null, foregroundLocPerm = null, backgroundLocPerm = null, motionPerm = null;
+      
+      if (permStateLine) {
+        notificationPerm = permStateLine.includes('NOTIFICATION, enabled=true');
+        foregroundLocPerm = permStateLine.includes('FOREGROUND_LOCATION, enabled=true');
+        backgroundLocPerm = permStateLine.includes('BACKGROUND_LOCATION, enabled=true');
+        motionPerm = permStateLine.includes('USER_MOTION, enabled=true');
+      }
+      
+      // Extract device state
+      const deviceStateLine = allLines.find(line => line.includes('isIgnoringBatteryOptimization'));
+      let batteryOptDisabled = null, powerSaveMode = null, deviceIdle = null, wifiEnabled = null, isInteractive = null;
+      
+      if (deviceStateLine) {
+        batteryOptDisabled = deviceStateLine.includes('isIgnoringBatteryOptimization: =true');
+        powerSaveMode = deviceStateLine.includes('isPowerSaveMode: =true');
+        deviceIdle = deviceStateLine.includes('isDeviceIdle: =true');
+        wifiEnabled = deviceStateLine.includes('isWifiEnabled: =true');
+        isInteractive = deviceStateLine.includes('isInteractive: =true');
+      }
+      
+      // Count issues
+      const dnsErrors = allLines.filter(line => line.includes('Could not resolve host') || line.includes('UnknownHostException')).length;
+      const uncleanStartups = allLines.filter(line => line.includes('STARTUP_UNCLEAN')).length;
+      const jobSiteBlocks = allLines.filter(line => line.includes('TRACKING_NOT_STARTED') || line.includes('requires being at a job site')).length;
+      
+      // Build status object
+      return {
+        user: { id: userId, name: userName, email: userEmail },
+        org: { id: orgId, name: orgName },
+        device: { manufacturer, model, osVersion },
+        location: {
+          isPrimary,
+          servicesEnabled,
+          permissionsEnabled,
+          accuracyEnabled,
+          locationEnabled
+        },
+        permissions: {
+          notification: notificationPerm,
+          foregroundLocation: foregroundLocPerm,
+          backgroundLocation: backgroundLocPerm,
+          motion: motionPerm
+        },
+        deviceState: {
+          batteryOptDisabled,
+          powerSaveMode,
+          deviceIdle,
+          wifiEnabled,
+          isInteractive
+        },
+        issues: {
+          dnsErrors,
+          uncleanStartups,
+          jobSiteBlocks
+        }
+      };
+    }
+
+    function renderDeviceDashboard(status) {
+      if (!status.user.id && !status.device.manufacturer) {
+        $('deviceDashboard').style.display = 'none';
+        return;
+      }
+      
+      const statusIcon = (value, trueIsGood = true) => {
+        if (value === null) return '<span class="status-icon">❓</span>';
+        const isGood = trueIsGood ? value : !value;
+        return isGood ? '<span class="status-icon success">✅</span>' : '<span class="status-icon error">❌</span>';
+      };
+      
+      const warnIcon = (value, trueIsGood = true) => {
+        if (value === null) return '<span class="status-icon">❓</span>';
+        const isGood = trueIsGood ? value : !value;
+        return isGood ? '<span class="status-icon success">✅</span>' : '<span class="status-icon warning">⚠️</span>';
+      };
+      
+      let html = `
+        <div class="device-dashboard">
+          <div class="dashboard-header">
+            <div class="dashboard-user-info">
+              <h3>📱 Device & Location Status</h3>
+              ${status.user.name ? `<p><strong>${status.user.name}</strong> (ID: ${status.user.id || 'Unknown'})</p>` : ''}
+              ${status.org.name ? `<p>🏢 ${status.org.name}</p>` : ''}
+            </div>
+            <div class="dashboard-device-info">
+              ${status.device.manufacturer ? `<div class="device-model">${status.device.manufacturer} ${status.device.model || ''}</div>` : ''}
+              ${status.device.osVersion ? `<div>Android API ${status.device.osVersion}</div>` : ''}
+            </div>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="dashboard-card">
+              <h4>📍 Location Status</h4>
+              <div class="status-row">${statusIcon(status.location.isPrimary)}<span class="status-label">Primary Device</span></div>
+              <div class="status-row">${statusIcon(status.location.locationEnabled)}<span class="status-label">Location Enabled</span></div>
+              <div class="status-row">${statusIcon(status.location.servicesEnabled)}<span class="status-label">Services Enabled</span></div>
+              <div class="status-row">${statusIcon(status.location.permissionsEnabled)}<span class="status-label">Permissions OK</span></div>
+              <div class="status-row">${statusIcon(status.location.accuracyEnabled)}<span class="status-label">Accuracy Enabled</span></div>
+            </div>
+            
+            <div class="dashboard-card">
+              <h4>🔐 Permissions</h4>
+              <div class="status-row">${statusIcon(status.permissions.foregroundLocation)}<span class="status-label">Foreground Location</span></div>
+              <div class="status-row">${statusIcon(status.permissions.backgroundLocation)}<span class="status-label">Background Location</span></div>
+              <div class="status-row">${statusIcon(status.permissions.notification)}<span class="status-label">Notifications</span></div>
+              <div class="status-row">${statusIcon(status.permissions.motion)}<span class="status-label">Motion/Activity</span></div>
+            </div>
+            
+            <div class="dashboard-card">
+              <h4>🔋 Device State</h4>
+              <div class="status-row">${warnIcon(status.deviceState.batteryOptDisabled)}<span class="status-label">Battery Opt Disabled</span></div>
+              <div class="status-row">${statusIcon(status.deviceState.powerSaveMode, false)}<span class="status-label">Power Save Mode</span><span class="status-value">${status.deviceState.powerSaveMode ? 'ON' : 'OFF'}</span></div>
+              <div class="status-row">${statusIcon(status.deviceState.deviceIdle, false)}<span class="status-label">Device Idle (Doze)</span><span class="status-value">${status.deviceState.deviceIdle ? 'YES' : 'NO'}</span></div>
+              <div class="status-row">${statusIcon(status.deviceState.wifiEnabled)}<span class="status-label">WiFi</span><span class="status-value">${status.deviceState.wifiEnabled ? 'ON' : 'OFF'}</span></div>
+            </div>
+            
+            <div class="dashboard-card">
+              <h4>⚠️ Issues Detected</h4>
+              <div class="status-row"><span class="status-icon ${status.issues.dnsErrors > 0 ? 'error' : 'success'}">${status.issues.dnsErrors > 0 ? '❌' : '✅'}</span><span class="status-label">Network/DNS Errors</span><span class="status-value">${status.issues.dnsErrors}</span></div>
+              <div class="status-row"><span class="status-icon ${status.issues.uncleanStartups > 5 ? 'error' : status.issues.uncleanStartups > 0 ? 'warning' : 'success'}">${status.issues.uncleanStartups > 5 ? '❌' : status.issues.uncleanStartups > 0 ? '⚠️' : '✅'}</span><span class="status-label">App Crashes/Kills</span><span class="status-value">${status.issues.uncleanStartups}</span></div>
+              <div class="status-row"><span class="status-icon ${status.issues.jobSiteBlocks > 0 ? 'error' : 'success'}">${status.issues.jobSiteBlocks > 0 ? '❌' : '✅'}</span><span class="status-label">Job Site Blocks</span><span class="status-value">${status.issues.jobSiteBlocks}</span></div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      $('deviceDashboard').innerHTML = html;
+      $('deviceDashboard').style.display = 'block';
+    }
+
+    // === ROOT CAUSE CONCLUSION GENERATION ===
+    function generateRootCauseConclusion(status, data) {
+      const dominated = []; // Issues sorted by severity/likelihood
+      const evidence = [];
+      const actionSteps = [];
+      
+      // === ANALYZE AND RANK ISSUES ===
+      
+      // 1. Job Site Blocks (user's direct complaint usually)
+      if (status.issues.jobSiteBlocks > 0) {
+        dominated.push({
+          severity: 10,
+          cause: "the user is <strong>not being detected at a job site</strong>",
+          detail: `The timer was blocked ${status.issues.jobSiteBlocks} time(s) because the system determined the user wasn't at a configured job site.`
+        });
+        evidence.push(`Timer blocked ${status.issues.jobSiteBlocks}x with "requires being at a job site" error`);
+      }
+      
+      // 2. Network/DNS Issues (prevents everything)
+      if (status.issues.dnsErrors > 10) {
+        dominated.push({
+          severity: 9,
+          cause: "<strong>no internet connection</strong> during key moments",
+          detail: `Found ${status.issues.dnsErrors} DNS/network failures. Without internet, the app cannot verify job site status or start tracking, even if GPS shows the correct location.`
+        });
+        evidence.push(`${status.issues.dnsErrors} DNS resolution failures (Could not resolve host)`);
+        actionSteps.push("Check if WiFi/mobile data was working during the issue");
+        actionSteps.push("Try switching between WiFi and cellular data");
+        actionSteps.push("Restart the device to reset network connections");
+      }
+      
+      // 3. Not Primary Device
+      if (status.location.isPrimary === false) {
+        dominated.push({
+          severity: 8,
+          cause: "this device is <strong>not set as the primary device</strong>",
+          detail: "Only the primary device can record locations and trigger job site automations. The user may have logged in on another device."
+        });
+        evidence.push("Device reports primary: false");
+        actionSteps.push("User should tap 'Make Primary' banner on the Timer screen");
+        actionSteps.push("Or check Admin → User page to see which device is primary");
+      }
+      
+      // 4. Battery Optimization Killing App
+      if (status.deviceState.batteryOptDisabled === false && status.issues.uncleanStartups > 5) {
+        dominated.push({
+          severity: 8,
+          cause: "<strong>Android is killing the app</strong> to save battery",
+          detail: `Battery optimization is ON and the app crashed/was killed ${status.issues.uncleanStartups} times. Android is aggressively closing Hubstaff in the background.`
+        });
+        evidence.push(`Battery optimization is ENABLED (isIgnoringBatteryOptimization: false)`);
+        evidence.push(`${status.issues.uncleanStartups} unclean startups (app was killed)`);
+        actionSteps.push("Disable battery optimization: Settings → Apps → Hubstaff → Battery → Unrestricted");
+        if (status.device.manufacturer?.toLowerCase() === 'samsung') {
+          actionSteps.push("Samsung: Also remove from 'Sleeping apps' and 'Deep sleeping apps' lists");
+        }
+      } else if (status.issues.uncleanStartups > 10) {
+        dominated.push({
+          severity: 7,
+          cause: "the <strong>app is repeatedly crashing or being killed</strong>",
+          detail: `Found ${status.issues.uncleanStartups} unclean startups. The app is not staying running in the background.`
+        });
+        evidence.push(`${status.issues.uncleanStartups} STARTUP_UNCLEAN events`);
+        actionSteps.push("Check battery optimization settings");
+        actionSteps.push("Check if user is manually force-closing the app");
+      }
+      
+      // 5. Background Location Permission
+      if (status.permissions.backgroundLocation === false) {
+        dominated.push({
+          severity: 8,
+          cause: "<strong>background location permission is not granted</strong>",
+          detail: "The app can only access location while on screen. Job site detection requires 'Allow all the time' permission."
+        });
+        evidence.push("BACKGROUND_LOCATION permission is disabled");
+        actionSteps.push("Settings → Apps → Hubstaff → Permissions → Location → 'Allow all the time'");
+      }
+      
+      // 6. Location Services Disabled
+      if (status.location.servicesEnabled === false) {
+        dominated.push({
+          severity: 9,
+          cause: "<strong>location services are disabled</strong> on the device",
+          detail: "The device's location services are turned off. GPS cannot work at all."
+        });
+        evidence.push("SERVICES_ENABLED is false in locationState");
+        actionSteps.push("Enable Location Services in device Settings");
+      }
+      
+      // 7. Battery optimization without crashes (potential future issue)
+      if (status.deviceState.batteryOptDisabled === false && status.issues.uncleanStartups <= 5) {
+        dominated.push({
+          severity: 4,
+          cause: "<strong>battery optimization is enabled</strong> (potential issue)",
+          detail: "Battery optimization is ON. While not causing crashes yet, this may cause issues with background tracking."
+        });
+        evidence.push("isIgnoringBatteryOptimization: false");
+        actionSteps.push("Recommend disabling battery optimization as a preventive measure");
+      }
+      
+      // Sort by severity
+      dominated.sort((a, b) => b.severity - a.severity);
+      
+      // === BUILD CONCLUSION ===
+      if (dominated.length === 0) {
+        // No issues found
+        return {
+          isSuccess: true,
+          html: `
+            <div class="root-cause-box success">
+              <h3>✅ No Major Issues Detected</h3>
+              <div class="conclusion">
+                Based on the log analysis, <strong>all device settings and permissions appear to be correctly configured</strong>. 
+                The app should be functioning normally for location tracking and job site detection.
+              </div>
+              <div class="evidence">
+                <h4>✓ Verified Working:</h4>
+                <ul>
+                  ${status.location.isPrimary !== false ? '<li>Device is set as primary</li>' : ''}
+                  ${status.location.servicesEnabled ? '<li>Location services are enabled</li>' : ''}
+                  ${status.permissions.backgroundLocation !== false ? '<li>Background location permission granted</li>' : ''}
+                  ${status.deviceState.batteryOptDisabled !== false ? '<li>Battery optimization is disabled</li>' : ''}
+                  ${status.issues.dnsErrors === 0 ? '<li>No network connectivity issues</li>' : ''}
+                </ul>
+              </div>
+              <div class="action-steps">
+                <h4>💡 If the user is still experiencing issues:</h4>
+                <ol>
+                  <li>Ask for more specific details about what's happening</li>
+                  <li>Check if the job site radius is large enough (recommend 100-150m)</li>
+                  <li>Verify the job site pin is in the correct location on the map</li>
+                  <li>Check GPS signal quality - try going outdoors with clear sky</li>
+                </ol>
+              </div>
+            </div>
+          `
+        };
+      }
+      
+      // Build HTML for issues found
+      const topCause = dominated[0];
+      const secondaryCauses = dominated.slice(1, 3).filter(d => d.severity >= 5);
+      
+      let conclusionText = `Based on the log analysis, the issue is most likely caused by ${topCause.cause}.`;
+      if (secondaryCauses.length > 0) {
+        conclusionText += ` Contributing factors may include: ${secondaryCauses.map(d => d.cause).join(', ')}.`;
+      }
+      
+      // Add specific context for job site + network combo (very common)
+      if (status.issues.jobSiteBlocks > 0 && status.issues.dnsErrors > 5) {
+        conclusionText += `<br><br><strong>Key insight:</strong> The user may have been physically at the job site, but the app couldn't verify this because there was no internet connection. Even with perfect GPS, the app needs network access to start tracking.`;
+      }
+      
+      return {
+        isSuccess: false,
+        html: `
+          <div class="root-cause-box">
+            <h3>🔍 Root Cause Analysis</h3>
+            <div class="conclusion">${conclusionText}</div>
+            <div class="evidence">
+              <h4>📋 Evidence from logs:</h4>
+              <ul>
+                ${evidence.map(e => `<li>${e}</li>`).join('')}
+              </ul>
+            </div>
+            ${actionSteps.length > 0 ? `
+            <div class="action-steps">
+              <h4>💡 Recommended Actions:</h4>
+              <ol>
+                ${actionSteps.map(a => `<li>${a}</li>`).join('')}
+              </ol>
+            </div>
+            ` : ''}
+          </div>
+        `
+      };
+    }
+
     function generateSummary(data) {
       const findings = [];
       
@@ -1295,6 +1840,107 @@
           action: 'This explains the issue! The app thinks it has permission but iOS disagrees. Fix: iOS Settings → Privacy & Security → Location Services → Hubstaff → "Always".',
           techDetail: 'App consent: ' + (appConsentsLocation ? appConsentsLocation.slice(0, 100) : 'found')
         });
+      }
+
+      // === ANDROID BATTERY OPTIMIZATION CHECK ===
+      const batteryOptLine = allLines.find(line => line.includes('isIgnoringBatteryOptimization'));
+      if (batteryOptLine) {
+        const isIgnoring = batteryOptLine.includes('isIgnoringBatteryOptimization: =true');
+        if (!isIgnoring) {
+          findings.push({
+            severity: 'warning',
+            icon: '🔋',
+            title: 'Battery Optimization NOT Disabled',
+            description: `Android battery optimization is <strong>active</strong> for Hubstaff. This means Android may kill the app in the background to save battery, causing tracking gaps and missed notifications.`,
+            action: 'Disable battery optimization: Settings → Apps → Hubstaff → Battery → "Unrestricted". Samsung: Also check Device Care → Battery → App power management.',
+            techDetail: batteryOptLine.slice(0, 200)
+          });
+        }
+      }
+
+      // === ANDROID REPEATED CRASH/KILL CHECK ===
+      const uncleanCount = allLines.filter(line => line.includes('STARTUP_UNCLEAN')).length;
+      if (uncleanCount > 5) {
+        findings.push({
+          severity: 'critical',
+          icon: '💥',
+          title: `App Killed/Crashed ${uncleanCount} Times`,
+          description: `Found <strong>${uncleanCount}</strong> unclean startup events. The app is being repeatedly killed by Android or crashing. This is very likely caused by aggressive battery optimization.`,
+          action: '1) Disable battery optimization for Hubstaff, 2) On Samsung: Check "Sleeping apps" and "Deep sleeping apps" lists - remove Hubstaff, 3) Enable "Autostart" if available on your device.',
+          techDetail: `Found ${uncleanCount} STARTUP_UNCLEAN events in logs`
+        });
+      } else if (uncleanCount > 0) {
+        findings.push({
+          severity: 'warning',
+          icon: '⚠️',
+          title: `App Crashed/Force-Closed ${uncleanCount} Time${uncleanCount > 1 ? 's' : ''}`,
+          description: `The app detected ${uncleanCount} unclean shutdown${uncleanCount > 1 ? 's' : ''} from previous sessions.`,
+          action: 'Check if user is force-closing the app or if battery optimization is killing it in the background.',
+          techDetail: null
+        });
+      }
+
+      // === ANDROID JOB SITE RESTRICTION BLOCK CHECK ===
+      const jobSiteBlocks = allLines.filter(line => line.includes('TRACKING_NOT_STARTED') || line.includes('requires being at a job site'));
+      if (jobSiteBlocks.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🚫',
+          title: `Timer Blocked ${jobSiteBlocks.length} Times - Not At Job Site`,
+          description: `User attempted to start the timer <strong>${jobSiteBlocks.length}</strong> time${jobSiteBlocks.length > 1 ? 's' : ''} but was blocked because they are not at a job site. The organization has "Restrict timer to job sites" enabled.`,
+          action: 'User must be physically at a configured job site to start tracking. If they ARE at a site: 1) GPS accuracy issue - try going outdoors with clear sky, 2) Job site radius may be too small - increase to 100-150m, 3) Job site pin location may be wrong on the map.',
+          techDetail: jobSiteBlocks.slice(0,3).map(l => l.slice(0, 120)).join('\n')
+        });
+      }
+
+      // === ANDROID DNS/NETWORK FAILURE CHECK ===
+      const dnsErrors = allLines.filter(line => line.includes('Could not resolve host') || line.includes('UnknownHostException'));
+      if (dnsErrors.length > 0) {
+        findings.push({
+          severity: 'critical',
+          icon: '🌐',
+          title: `Network/DNS Failures Detected (${dnsErrors.length} errors)`,
+          description: `Found <strong>${dnsErrors.length}</strong> DNS resolution failures. The device could not reach Hubstaff servers because there was no working internet connection during these times.`,
+          action: 'Check: 1) WiFi or mobile data is ON, 2) Airplane mode is OFF, 3) Try switching between WiFi and cellular, 4) Restart the device. Data cannot sync without internet.',
+          techDetail: dnsErrors.slice(0,2).map(l => l.slice(0, 100)).join('\n')
+        });
+      }
+
+      // === ANDROID DEVICE DETECTION ===
+      const deviceLine = allLines.find(line => line.includes('device manufacturer'));
+      if (deviceLine) {
+        const mfgMatch = deviceLine.match(/manufacturer\s*:\s*(\w+)/i);
+        const modelMatch = deviceLine.match(/model:\s*([\w-]+)/i);
+        const osMatch = deviceLine.match(/OS:\s*(\d+)/i);
+        
+        if (mfgMatch || modelMatch) {
+          const manufacturer = mfgMatch ? mfgMatch[1] : 'Unknown';
+          const model = modelMatch ? modelMatch[1] : 'Unknown';
+          const osVersion = osMatch ? osMatch[1] : 'Unknown';
+          
+          let deviceWarning = null;
+          // Brand-specific battery warnings
+          if (manufacturer.toLowerCase() === 'samsung') {
+            deviceWarning = 'Samsung devices have aggressive battery optimization. Ensure Hubstaff is set to "Unrestricted" and NOT in "Sleeping apps" or "Deep sleeping apps" lists.';
+          } else if (manufacturer.toLowerCase() === 'xiaomi' || manufacturer.toLowerCase() === 'redmi') {
+            deviceWarning = 'Xiaomi/MIUI has very aggressive battery management. Enable "Autostart" for Hubstaff and disable all battery restrictions.';
+          } else if (manufacturer.toLowerCase() === 'huawei') {
+            deviceWarning = 'Huawei restricts background apps heavily. Add Hubstaff to "Protected Apps" and disable power-saving for it.';
+          } else if (manufacturer.toLowerCase() === 'oppo' || manufacturer.toLowerCase() === 'realme') {
+            deviceWarning = 'OPPO/Realme has aggressive app killing. Enable "Allow Auto-start" and disable battery optimization for Hubstaff.';
+          } else if (manufacturer.toLowerCase() === 'oneplus') {
+            deviceWarning = 'OnePlus: Settings → Battery → Battery Optimization → Hubstaff → Don\'t optimize.';
+          }
+          
+          findings.push({
+            severity: deviceWarning ? 'info' : 'info',
+            icon: '📱',
+            title: `Android Device: ${manufacturer} ${model} (API ${osVersion})`,
+            description: `Detected Android device from logs.`,
+            action: deviceWarning,
+            techDetail: null
+          });
+        }
       }
 
       // === INJECTED INPUT ===
@@ -1936,6 +2582,19 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         $('kpiTimeSpan').textContent = '--';
       }
 
+      // Generate and render device dashboard
+      const deviceStatus = generateDeviceDashboard(data);
+      renderDeviceDashboard(deviceStatus);
+      
+      // Generate and render root cause conclusion
+      if (plainMode) {
+        const conclusion = generateRootCauseConclusion(deviceStatus, data);
+        $('rootCauseCard').innerHTML = conclusion.html;
+        $('rootCauseCard').style.display = 'block';
+      } else {
+        $('rootCauseCard').style.display = 'none';
+      }
+
       // Generate and render summary if plain mode
       if (plainMode) {
         const findings = generateSummary(data);
@@ -2292,6 +2951,8 @@ $('appsCount').textContent = actualAppsCount;
       render(null);
       $('timelineSection').style.display = 'none';
       $('filterStats').style.display = 'none';
+      $('deviceDashboard').style.display = 'none';
+      $('rootCauseCard').style.display = 'none';
       hideInfoBox();
       $('status').textContent = '🔒 All data cleared';
       $('status').className = 'status success';
