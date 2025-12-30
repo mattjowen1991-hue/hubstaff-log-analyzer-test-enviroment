@@ -437,6 +437,72 @@
     .root-cause-box .action-steps li {
       margin: 4px 0;
     }
+    /* Job Sites Table Styles */
+    .job-sites-summary {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid #10b981;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .job-sites-summary h4 {
+      color: #10b981;
+      font-size: 13px;
+      margin: 0 0 10px 0;
+    }
+    .job-sites-summary .stats-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .job-sites-summary .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .job-sites-summary .stat-value {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .job-sites-summary .stat-label {
+      color: var(--muted);
+    }
+    .job-sites-table {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    .job-sites-table table {
+      font-size: 11px;
+    }
+    .job-sites-table th {
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+    }
+    .radius-small { color: var(--warn); }
+    .radius-ok { color: var(--success); }
+    .user-location-box {
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid var(--accent-dim);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+    .user-location-box h4 {
+      color: var(--accent);
+      font-size: 12px;
+      margin: 0 0 8px 0;
+    }
+    .user-location-box .coords {
+      font-family: monospace;
+      color: var(--text);
+    }
     .summary-item .show-tech { font-size: 10px; color: var(--muted); cursor: pointer; text-decoration: underline; margin-left: 8px; }
 
     .plain-explanation { font-size: 11px; color: var(--accent); margin-top: 4px; padding: 6px 10px; background: rgba(168,85,247,0.1); border-radius: 4px; border-left: 2px solid var(--accent); }
@@ -1458,12 +1524,33 @@
       
       // 1. Job Site Blocks (user's direct complaint usually)
       if (status.issues.jobSiteBlocks > 0) {
+        // Check for small radius sites
+        const geofenceLines = allLines.filter(l => l.includes('creating geofence') && !l.includes('id=-'));
+        const radiusMatches = geofenceLines.map(l => {
+          const m = l.match(/,\s*(\d+)\)$/);
+          return m ? parseInt(m[1]) : null;
+        }).filter(r => r !== null);
+        const smallRadiusCount = radiusMatches.filter(r => r <= 50).length;
+        const totalSites = new Set(geofenceLines.map(l => {
+          const m = l.match(/id=(\d+)/);
+          return m ? m[1] : null;
+        })).size;
+        
+        let radiusNote = '';
+        if (smallRadiusCount > totalSites * 0.5) {
+          radiusNote = ` <strong>Note:</strong> ${smallRadiusCount} of ${totalSites} sites have a 50m radius, which may be too small for reliable detection indoors.`;
+        }
+        
         dominated.push({
           severity: 10,
           cause: "the user is <strong>not being detected at a job site</strong>",
-          detail: `The timer was blocked ${status.issues.jobSiteBlocks} time(s) because the system determined the user wasn't at a configured job site.`
+          detail: `The timer was blocked ${status.issues.jobSiteBlocks} time(s) because the system determined the user wasn't at a configured job site.${radiusNote}`
         });
         evidence.push(`Timer blocked ${status.issues.jobSiteBlocks}x with "requires being at a job site" error`);
+        if (smallRadiusCount > 0) {
+          evidence.push(`${smallRadiusCount} job sites have 50m radius (may be too small)`);
+          actionSteps.push("Consider increasing job site radius to 100-150m for better indoor detection");
+        }
       }
       
       // 2. Network/DNS Issues (prevents everything)
@@ -2292,7 +2379,10 @@ const braveInLogs = allLines.some(line =>
         idleDiscardedSecs: 0,
         timezone: null,
         startTime: null,
-        endTime: null
+        endTime: null,
+        jobSites: [],
+        userLocations: [],
+        currentlyEnteredSites: []
       };
 
       const showDebug = $('showDebug').checked;
@@ -2500,6 +2590,45 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         // Tracking events
         if (line.includes('Resume') || line.includes('Idle') || line.includes('Discard=') || line.includes('Startup') || line.includes('START_TRACKING') || line.includes('STOP_TRACKING')) {
           data.tracking.push(entry);
+        }
+
+        // Job Sites / Geofences - extract site details
+        if (line.includes('creating geofence') && !line.includes('id=-')) {
+          const siteMatch = line.match(/id=(\d+),\s*name=([^,]+),\s*loc\s*\(([^,]+),\s*([^,]+),\s*(\d+)\)/);
+          if (siteMatch) {
+            data.jobSites.push({
+              id: siteMatch[1],
+              name: siteMatch[2].trim(),
+              lat: parseFloat(siteMatch[3]),
+              lng: parseFloat(siteMatch[4]),
+              radius: parseInt(siteMatch[5]),
+              ts: ts
+            });
+          }
+        }
+
+        // User's current location
+        if (line.includes('current location is AppLocation')) {
+          const locMatch = line.match(/latitude=([^,]+),\s*longitude=([^,]+),\s*hAccuracy=([^)]+)/);
+          if (locMatch) {
+            data.userLocations.push({
+              ts: ts,
+              lat: parseFloat(locMatch[1]),
+              lng: parseFloat(locMatch[2]),
+              accuracy: parseFloat(locMatch[3])
+            });
+          }
+        }
+
+        // Currently entered sites
+        if (line.includes('currently entered sites are:')) {
+          const sitesMatch = line.match(/currently entered sites are:\s*\[([^\]]*)\]/);
+          if (sitesMatch) {
+            data.currentlyEnteredSites.push({
+              ts: ts,
+              sites: sitesMatch[1].trim()
+            });
+          }
         }
       }
 
@@ -2771,6 +2900,80 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No network issues found</td></tr>';
 
       // Locations
+      // First render job sites summary if we have site data
+      let locationsPreamble = '';
+      
+      if (data.jobSites.length > 0) {
+        // Deduplicate sites by ID
+        const uniqueSites = [...new Map(data.jobSites.map(s => [s.id, s])).values()];
+        const radiusCounts = {};
+        uniqueSites.forEach(s => {
+          radiusCounts[s.radius] = (radiusCounts[s.radius] || 0) + 1;
+        });
+        const smallRadiusSites = uniqueSites.filter(s => s.radius <= 50);
+        
+        // Get user's most recent location
+        const lastUserLoc = data.userLocations.length > 0 ? data.userLocations[data.userLocations.length - 1] : null;
+        
+        // Check if user was ever inside a site
+        const enteredAnySite = data.currentlyEnteredSites.some(e => e.sites && e.sites.length > 0);
+        
+        locationsPreamble = `
+          <div class="job-sites-summary">
+            <h4>📍 Job Sites Configuration</h4>
+            <div class="stats-row">
+              <div class="stat"><span class="stat-value">${uniqueSites.length}</span><span class="stat-label">Total Sites</span></div>
+              <div class="stat"><span class="stat-value">${Object.keys(radiusCounts).map(r => `${radiusCounts[r]}×${r}m`).join(', ')}</span><span class="stat-label">Radius Distribution</span></div>
+              ${smallRadiusSites.length > 0 ? `<div class="stat"><span class="stat-value radius-small">⚠️ ${smallRadiusSites.length} sites with 50m radius</span></div>` : ''}
+            </div>
+            ${!enteredAnySite && data.currentlyEnteredSites.length > 0 ? `
+              <div style="color:var(--warn); font-size:11px; margin-top:8px;">
+                ⚠️ User was never detected inside any job site during this log period. All "currently entered sites" checks returned empty.
+              </div>
+            ` : ''}
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer; color:var(--accent); font-size:12px;">Show all ${uniqueSites.length} job sites</summary>
+              <div class="job-sites-table">
+                <table>
+                  <thead><tr><th>Site Name</th><th>Radius</th><th>Coordinates</th></tr></thead>
+                  <tbody>
+                    ${uniqueSites.slice(0, 100).map(s => `
+                      <tr>
+                        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</td>
+                        <td><span class="${s.radius <= 50 ? 'radius-small' : 'radius-ok'}">${s.radius}m</span></td>
+                        <td style="font-family:monospace;font-size:10px;">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</td>
+                      </tr>
+                    `).join('')}
+                    ${uniqueSites.length > 100 ? `<tr><td colspan="3" style="color:var(--muted)">... and ${uniqueSites.length - 100} more sites</td></tr>` : ''}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+          ${lastUserLoc ? `
+            <div class="user-location-box">
+              <h4>📱 User's Last Known Location</h4>
+              <div class="coords">${lastUserLoc.lat.toFixed(6)}, ${lastUserLoc.lng.toFixed(6)}</div>
+              <div style="color:var(--muted); margin-top:4px;">Accuracy: ${lastUserLoc.accuracy}m at ${fmtTime(lastUserLoc.ts)}</div>
+              ${lastUserLoc.accuracy > 50 ? `<div style="color:var(--warn); margin-top:4px;">⚠️ GPS accuracy is poor (${lastUserLoc.accuracy}m). This may affect job site detection.</div>` : ''}
+            </div>
+          ` : ''}
+        `;
+      }
+      
+      // Prepend job sites info to locations content
+      const locationsContentEl = $('locationsContent');
+      let existingPreamble = locationsContentEl.querySelector('.job-sites-summary');
+      if (existingPreamble) existingPreamble.remove();
+      let existingUserLoc = locationsContentEl.querySelector('.user-location-box');
+      if (existingUserLoc) existingUserLoc.remove();
+      
+      if (locationsPreamble) {
+        const preambleDiv = document.createElement('div');
+        preambleDiv.innerHTML = locationsPreamble;
+        locationsContentEl.insertBefore(preambleDiv, locationsContentEl.firstChild);
+      }
+      
       $('locationsBody').innerHTML = data.locations.slice(0, 50).map(e => `
         <tr>
           <td>${fmtTime(e.ts)}</td>
