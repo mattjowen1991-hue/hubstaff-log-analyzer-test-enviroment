@@ -2065,6 +2065,86 @@
         actionSteps.push("Recommend disabling battery optimization as a preventive measure");
       }
       
+      // 8. Job Site / Geofence Analysis
+      if (data.geofenceEvents && data.geofenceEvents.length > 0) {
+        const uniqueSites = [...new Map(data.jobSites.map(s => [s.id, s])).values()];
+        
+        // Analyze each geofence event
+        let outsideRadiusCount = 0;
+        let poorAccuracyCount = 0;
+        let enterEvents = 0;
+        let exitEvents = 0;
+        const outsideDetails = [];
+        
+        data.geofenceEvents.forEach(evt => {
+          if (evt.type === 'ENTER') enterEvents++;
+          if (evt.type === 'EXIT') exitEvents++;
+          
+          if (evt.accuracy && evt.accuracy > 50) poorAccuracyCount++;
+          
+          if (uniqueSites.length > 0) {
+            const nearest = findNearestSite(evt.lat, evt.lng, uniqueSites);
+            if (nearest && nearest.distance > nearest.radius) {
+              outsideRadiusCount++;
+              const outsideBy = nearest.distance - nearest.radius;
+              outsideDetails.push(`${evt.type} event ${nearest.distance}m from "${nearest.name}" (radius: ${nearest.radius}m, ${outsideBy}m outside)`);
+            }
+          }
+        });
+        
+        // Add findings based on analysis
+        if (outsideRadiusCount > 0) {
+          dominated.push({
+            severity: 7,
+            cause: `<strong>user was outside job site radius</strong> during ${outsideRadiusCount} geofence event${outsideRadiusCount > 1 ? 's' : ''}`,
+            detail: `The user triggered geofence boundaries but was actually outside the configured site radius. This can happen when: 1) Job site radius is too small, 2) GPS accuracy is poor, 3) The job site pin is in the wrong location.`
+          });
+          evidence.push(`${outsideRadiusCount} of ${data.geofenceEvents.length} geofence events were outside the nearest site's radius`);
+          outsideDetails.slice(0, 3).forEach(d => evidence.push(d));
+          actionSteps.push("Check the Locations section for map links to compare user position vs site location");
+          actionSteps.push("Consider increasing job site radius to 100-150m");
+        }
+        
+        if (poorAccuracyCount > data.geofenceEvents.length * 0.5) {
+          dominated.push({
+            severity: 5,
+            cause: "<strong>GPS accuracy was poor</strong> during location events",
+            detail: `${poorAccuracyCount} of ${data.geofenceEvents.length} location events had accuracy worse than 50m. Poor GPS signal makes job site detection unreliable.`
+          });
+          evidence.push(`${poorAccuracyCount} events with GPS accuracy >50m`);
+          actionSteps.push("User should try going outdoors with clear sky view for better GPS");
+          actionSteps.push("Check if device has 'High Accuracy' location mode enabled");
+        }
+        
+        // Add summary even if no issues
+        if (outsideRadiusCount === 0 && enterEvents > 0) {
+          evidence.push(`✓ ${enterEvents} site entry event${enterEvents > 1 ? 's' : ''} detected, all within configured radius`);
+        }
+      }
+      
+      // 9. Job Sites Configuration Issues
+      if (data.jobSites && data.jobSites.length > 0) {
+        const uniqueSites = [...new Map(data.jobSites.map(s => [s.id, s])).values()];
+        const smallRadiusSites = uniqueSites.filter(s => s.radius <= 50);
+        
+        if (smallRadiusSites.length > uniqueSites.length * 0.5) {
+          dominated.push({
+            severity: 5,
+            cause: `<strong>${smallRadiusSites.length} of ${uniqueSites.length} job sites have small radius</strong> (≤50m)`,
+            detail: "A 50m radius is often too small for reliable detection, especially indoors where GPS accuracy is reduced. This frequently causes 'not at job site' errors even when the user is physically present."
+          });
+          evidence.push(`${smallRadiusSites.length} sites configured with ≤50m radius`);
+          actionSteps.push("Increase job site radius to 100-150m for more reliable detection");
+        }
+      }
+      
+      // 10. No geofence events but job site blocks
+      if (status.issues.jobSiteBlocks > 0 && (!data.geofenceEvents || data.geofenceEvents.length === 0)) {
+        evidence.push("⚠️ Timer was blocked for job site reasons but no geofence events found in logs");
+        actionSteps.push("Enable 'Show DEBUG level' to see detailed location data");
+        actionSteps.push("Check if location permissions are set to 'Always' (not 'While Using')");
+      }
+      
       // Sort by severity
       dominated.sort((a, b) => b.severity - a.severity);
       
