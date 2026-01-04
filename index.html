@@ -2258,7 +2258,7 @@
             title: `Log Duration: ${fmtDuration(logDurationSecs)} vs Tracked: ${fmtDuration(totalTrackedSecs)}`,
             description: `The log file spans <strong>${fmtDuration(logDurationSecs)}</strong>, but only <strong>${fmtDuration(totalTrackedSecs)}</strong> was actually tracked. This is normal - the app continues logging background activity (app focus, URL detection, system monitoring) even when the timer is not running. <strong>Only time between START and STOP events counts as tracked time.</strong>`,
             action: 'The difference does NOT mean time was lost. Background logs help with diagnostics but do not represent billable time.',
-            techDetail: null
+
           });
         }
         
@@ -2296,7 +2296,7 @@
             title: 'No Crash Indicators Found',
             description: 'The logs show no signs of app crashes, force-quits, or unexpected terminations. All sessions have proper START and STOP events. If the app had crashed, we would expect to see: STARTUP_UNCLEAN, RESUME_DETECTED, watchdog hits, or missing STOP events.',
             action: null,
-            techDetail: null
+
           });
         }
       } else {
@@ -2337,32 +2337,184 @@
       }
 
       // === APP VERSION CHECK ===
-      const versionLine = allLines.find(line => line.includes('Version') && line.includes('2.2.'));
-      if (versionLine) {
-        const versionMatch = versionLine.match(/(\d+\.\d+\.\d+)/);
-        if (versionMatch) {
-          const version = versionMatch[1];
-          // Known problematic versions
-          if (version === '2.2.68') {
-            findings.push({
-              severity: 'critical',
-              icon: '📱',
-              title: 'Problematic App Version Detected: 2.2.68',
-              description: `App version <strong>2.2.68</strong> has a known bug that causes locations to temporarily stop uploading. This version was identified by the development team as problematic.`,
-              action: 'Have the user update to the latest version of Hubstaff from the App Store immediately. This is likely the cause of missing location data.',
-              techDetail: versionLine.slice(0, 150)
-            });
-          } else {
-            findings.push({
-              severity: 'info',
-              icon: '📱',
-              title: `App Version: ${version}`,
-              description: `Detected Hubstaff app version from logs.`,
-              action: null,
-              techDetail: null
-            });
+      // Detect app version and platform from logs
+      let appVersion = null;
+      let appPlatform = null;
+      let buildNumber = null;
+      let versionLine = null;
+      
+      // Search for version patterns in logs
+      for (const line of allLines) {
+        // iOS: "2.2.72-100174-main-g77190d27" or "Hubstaff/2.2.72"
+        if (!appVersion && (line.includes('Hubstaff/') || line.includes('CFBundle') || line.includes('-main-g'))) {
+          const iosMatch = line.match(/(\d+\.\d+\.\d+)-(\d+)-main-g([a-f0-9]+)/i) ||
+                          line.match(/Hubstaff\/(\d+\.\d+\.\d+)/) ||
+                          line.match(/CFBundleShortVersionString[:\s]+(\d+\.\d+\.\d+)/);
+          if (iosMatch) {
+            appVersion = iosMatch[1];
+            if (iosMatch[2]) buildNumber = iosMatch[2];
+            appPlatform = 'iOS';
+            versionLine = line;
           }
         }
+        
+        // Android: "2.2.75-63528" or "versionName=2.2.75"
+        if (!appVersion && (line.includes('versionName') || line.match(/\d+\.\d+\.\d+-\d{4,}/))) {
+          const androidMatch = line.match(/(\d+\.\d+\.\d+)-(\d{4,})/) ||
+                               line.match(/versionName[=:\s]+(\d+\.\d+\.\d+)/);
+          if (androidMatch) {
+            appVersion = androidMatch[1];
+            if (androidMatch[2]) buildNumber = androidMatch[2];
+            appPlatform = 'Android';
+            versionLine = line;
+          }
+        }
+        
+        // Windows/Mac/Linux desktop: "Version: 1.6.8" or "Hubstaff Desktop 1.6.8"
+        if (!appVersion && (line.includes('Hubstaff Desktop') || line.includes('Desktop Version'))) {
+          const desktopMatch = line.match(/(\d+\.\d+\.\d+)/);
+          if (desktopMatch) {
+            appVersion = desktopMatch[1];
+            versionLine = line;
+            // Try to detect OS
+            if (line.toLowerCase().includes('windows') || allLines.some(l => l.includes('Windows') || l.includes('win32'))) {
+              appPlatform = 'Windows';
+            } else if (line.toLowerCase().includes('mac') || allLines.some(l => l.includes('macOS') || l.includes('darwin'))) {
+              appPlatform = 'Mac';
+            } else if (line.toLowerCase().includes('linux') || allLines.some(l => l.includes('Linux') || l.includes('linux'))) {
+              appPlatform = 'Linux';
+            } else {
+              appPlatform = 'Desktop';
+            }
+          }
+        }
+        
+        // Chrome/Firefox Extension: "Extension Version: 1.5.2"
+        if (!appVersion && (line.includes('Extension') && line.includes('Version'))) {
+          const extMatch = line.match(/(\d+\.\d+\.\d+)/);
+          if (extMatch) {
+            appVersion = extMatch[1];
+            versionLine = line;
+            if (line.toLowerCase().includes('chrome') || allLines.some(l => l.includes('Chrome'))) {
+              appPlatform = 'Chrome Extension';
+            } else if (line.toLowerCase().includes('firefox') || allLines.some(l => l.includes('Firefox'))) {
+              appPlatform = 'Firefox Extension';
+            } else {
+              appPlatform = 'Browser Extension';
+            }
+          }
+        }
+        
+        // Chromebook
+        if (!appVersion && (line.includes('Chromebook') || line.includes('ChromeOS') || line.includes('CrOS'))) {
+          const chromeOsMatch = line.match(/(\d+\.\d+\.\d+)/);
+          if (chromeOsMatch) {
+            appVersion = chromeOsMatch[1];
+            appPlatform = 'Chromebook';
+            versionLine = line;
+          }
+        }
+        
+        // Web Timer
+        if (!appVersion && (line.includes('Web Timer') || line.includes('web-timer'))) {
+          const webMatch = line.match(/(\d+\.\d+\.\d+)/);
+          if (webMatch) {
+            appVersion = webMatch[1];
+            appPlatform = 'Web Timer';
+            versionLine = line;
+          }
+        }
+        
+        // Generic fallback: "App Version: X.X.X" or "Client Version: X.X.X"
+        if (!appVersion && (line.includes('App Version') || line.includes('Client Version') || line.includes('APPLICATION_VERSION'))) {
+          const genericMatch = line.match(/(\d+\.\d+\.\d+)/);
+          if (genericMatch) {
+            appVersion = genericMatch[1];
+            versionLine = line;
+          }
+        }
+        
+        // Stop searching once we found a version
+        if (appVersion) break;
+      }
+      
+      // Detect platform from other indicators if not already set
+      if (!appPlatform) {
+        if (allLines.some(line => line.includes('UIKit') || line.includes('kCLErrorDomain') || line.includes('CoreLocation'))) {
+          appPlatform = 'iOS';
+        } else if (allLines.some(line => line.includes('android.') || line.match(/manufacturer\s*:/i) || line.includes('Xiaomi') || line.includes('Samsung'))) {
+          appPlatform = 'Android';
+        } else if (allLines.some(line => line.includes('WindowsInput') || line.includes('win32') || line.includes('Windows'))) {
+          appPlatform = 'Windows';
+        } else if (allLines.some(line => line.includes('macOS') || line.includes('darwin') || line.includes('NSApplication'))) {
+          appPlatform = 'Mac';
+        } else if (allLines.some(line => line.includes('Linux') && !line.includes('linux-'))) {
+          appPlatform = 'Linux';
+        }
+      }
+      
+      // Known problematic versions (update as needed)
+      const PROBLEMATIC_VERSIONS = {
+        'iOS': {
+          '2.2.68': 'Known bug causing locations to temporarily stop uploading.',
+          '2.2.65': 'Issues with background location tracking on some devices.',
+        },
+        'Android': {
+          '2.2.68': 'Geofence detection reliability issues.',
+        },
+        'Windows': {},
+        'Mac': {},
+        'Linux': {},
+      };
+      
+      if (appVersion) {
+        const platformProblems = PROBLEMATIC_VERSIONS[appPlatform] || {};
+        const isProblematic = platformProblems[appVersion];
+        
+        const fullVersionString = buildNumber ? `${appVersion}-${buildNumber}` : appVersion;
+        const platformIcon = {
+          'iOS': '🍎',
+          'Android': '🤖',
+          'Windows': '🪟',
+          'Mac': '🍎',
+          'Linux': '🐧',
+          'Chrome Extension': '🌐',
+          'Firefox Extension': '🦊',
+          'Chromebook': '💻',
+          'Web Timer': '🌐',
+          'Desktop': '🖥️',
+          'Browser Extension': '🔌',
+        }[appPlatform] || '📱';
+        
+        if (isProblematic) {
+          findings.push({
+            severity: 'critical',
+            icon: platformIcon,
+            title: `${appPlatform || 'App'} Version: ${fullVersionString} ⚠️ KNOWN ISSUES`,
+            description: `<strong>${isProblematic}</strong>`,
+            action: `Have the user update to the latest version immediately.`,
+            techDetail: versionLine ? versionLine.slice(0, 200) : null
+          });
+        } else {
+          findings.push({
+            severity: 'info',
+            icon: platformIcon,
+            title: `${appPlatform || 'App'} Version: ${fullVersionString}`,
+            description: `Detected from logs. <a href="https://app.hubstaff.com/admin/releases" target="_blank" style="color:var(--link);">Check releases page</a> to verify if current.`,
+            action: null,
+            techDetail: versionLine ? versionLine.slice(0, 200) : null
+          });
+        }
+      } else {
+        // No version detected
+        findings.push({
+          severity: 'info',
+          icon: '❓',
+          title: 'App Version: Not Detected',
+          description: 'Could not find app version in logs. This may be a partial log or the version info was not captured.',
+          action: 'Ask the user for their app version from Settings > About, or check the device info in the Admin panel.',
+          techDetail: null
+        });
       }
 
       // === iOS PERMISSION STATUS CHECK ===
@@ -2535,7 +2687,7 @@
             title: `Android Device: ${manufacturer} ${model} (API ${osVersion})`,
             description: `Detected Android device from logs.`,
             action: deviceWarning,
-            techDetail: null
+
           });
         }
       }
