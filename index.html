@@ -3807,7 +3807,7 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
           const responseTime = d.responseTimeSecs ? `${d.responseTimeSecs}s` : '—';
           
           return `<tr>
-            <td>${fmtTime(d.ts)}</td>
+            <td>${fmtDate(d.ts)}</td>
             <td>${fmtDuration(d.seconds)}${durationNote}</td>
             <td style="color:var(--muted)">${responseTime}</td>
             <td><span class="tag ${decisionCls}">${plainMode ? (actionIcon + ' ' + actionText) : d.decision}</span></td>
