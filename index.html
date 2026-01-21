@@ -4234,8 +4234,7 @@ $('appsCount').textContent = actualAppsCount;
       content.classList.remove('collapsed');
     }
 
-    // Help Guide functionality
-    $('helpBtn').onclick = () => $('helpModal').classList.add('visible');
+   // Help Guide functionality
     $('helpGuideBtn').onclick = () => $('helpModal').classList.add('visible');
     $('closeHelp').onclick = () => $('helpModal').classList.remove('visible');
     $('helpModal').onclick = e => { if (e.target === $('helpModal')) $('helpModal').classList.remove('visible'); };
