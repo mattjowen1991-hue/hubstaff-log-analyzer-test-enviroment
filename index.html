@@ -195,6 +195,29 @@
 
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; }
     .modal-overlay.visible { display: flex; }
+    /* Help Guide Styles */
+    .help-guide { max-width: 900px; max-height: 90vh; }
+    .help-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .help-nav-btn { background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; }
+    .help-nav-btn:hover { border-color: var(--accent); color: var(--text); }
+    .help-nav-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .help-section { display: none; }
+    .help-section.active { display: block; }
+    .help-section h3 { color: var(--accent); margin: 20px 0 12px; font-size: 15px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .help-section h3:first-child { margin-top: 0; }
+    .help-section h4 { color: var(--link); margin: 16px 0 8px; font-size: 13px; }
+    .help-section p { margin: 8px 0; line-height: 1.6; }
+    .help-section ul { margin: 8px 0 16px 20px; }
+    .help-section li { margin: 6px 0; line-height: 1.5; }
+    .help-section code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--accent); }
+    .help-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+    .help-table th, .help-table td { padding: 10px 12px; text-align: left; border: 1px solid var(--border); }
+    .help-table th { background: var(--panel); color: var(--muted); font-weight: 600; }
+    .help-table tr:hover { background: rgba(168,85,247,0.05); }
+    .help-callout { background: rgba(168,85,247,0.1); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+    .help-callout.warning { background: rgba(245,158,11,0.1); border-left-color: var(--warn); }
+    .help-callout.success { background: rgba(34,197,94,0.1); border-left-color: var(--success); }
+    .help-callout.danger { background: rgba(239,68,68,0.1); border-left-color: var(--danger); }
     .modal { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 24px; }
     .modal h2 { color: var(--link); margin-bottom: 16px; font-size: 18px; }
     .modal h3 { color: var(--accent); margin: 20px 0 10px; font-size: 14px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
@@ -1061,6 +1084,8 @@
     <footer>
       <span>Hubstaff Client Log Analyzer</span>
       <span style="margin:0 10px;">|</span>
+      <span class="help-link" id="helpGuideBtn">📖 Help Guide</span>
+      <span style="margin:0 10px;">|</span>
       <span class="help-link" id="privacyBtn">🔒 Privacy Info</span>
     </footer>
   </main>
@@ -1109,98 +1134,311 @@
   </div>
 
   <div class="modal-overlay" id="helpModal">
-    <div class="modal">
+    <div class="modal help-guide">
       <button class="close-btn" id="closeHelp">Close</button>
-      <h2>🔮 Client Log Analyzer Help</h2>
+      <h2>📖 Hubstaff Client Log Analyzer - Help Guide</h2>
       
-      <h3>What this tool analyzes</h3>
-      <p>This analyzer is designed for <code>hubstaff.log</code> files (the detailed client logs), not audit.log files. It extracts and categorizes:</p>
-      <ul>
-        <li><strong>Errors & Crashes</strong> - [ERROR] level events, watchdog hits, helper crashes</li>
-        <li><strong>Warnings</strong> - [WARN] level events, discarded time, anomalies</li>
-        <li><strong>Screenshots</strong> - Capture events, uploads, failures</li>
-        <li><strong>Network</strong> - API responses, connection issues, sync problems</li>
-        <li><strong>Locations</strong> - Job site events, geofence entries/exits</li>
-        <li><strong>URLs & Apps</strong> - Tracked applications and websites</li>
-        <li><strong>Time Tracking</strong> - Resume, idle, discard events</li>
-      </ul>
+      <nav class="help-nav">
+        <button class="help-nav-btn active" data-section="overview">Overview</button>
+        <button class="help-nav-btn" data-section="interface">Interface</button>
+        <button class="help-nav-btn" data-section="idle">Idle Time</button>
+        <button class="help-nav-btn" data-section="sessions">Sessions</button>
+        <button class="help-nav-btn" data-section="jobsites">Job Sites</button>
+        <button class="help-nav-btn" data-section="ios">iOS</button>
+        <button class="help-nav-btn" data-section="android">Android</button>
+        <button class="help-nav-btn" data-section="desktop">Desktop</button>
+        <button class="help-nav-btn" data-section="patterns">Log Patterns</button>
+      </nav>
 
-      <h3>Built-in Noise Filter</h3>
-      <p>The analyzer has a built-in noise filter (enabled by default). It automatically removes routine log lines that don't help with debugging:</p>
-      <ul>
-        <li><code>WindowsInput.cpp</code> - Mouse/keyboard coordinates</li>
-        <li><code>InputExtension.h</code> - Routine input tracking</li>
-        <li><code>Heart beat</code> - Keep-alive messages</li>
-        <li><code>Response: 200/201/204</code> - Successful API calls</li>
-        <li><code>StorageIO.*Wrote</code> - Routine database writes (unless Location/TrackedActivity)</li>
-        <li><code>Storage.h.*Read</code> - Routine reads</li>
-      </ul>
-      <p>Uncheck "Auto-filter noise" if you need to see all raw log lines.</p>
+      <!-- OVERVIEW SECTION -->
+      <div class="help-section active" id="help-overview">
+        <h3>What This Tool Analyzes</h3>
+        <p>This analyzer is designed for <code>hubstaff.log</code> files (detailed client logs), not audit.log files. It works with logs from Windows, Mac, Linux, iOS, and Android.</p>
+        
+        <h4>Event Categories</h4>
+        <table class="help-table">
+          <tr><th>Category</th><th>What's Captured</th></tr>
+          <tr><td><strong>Errors & Crashes</strong></td><td>[ERROR] events, watchdog hits, helper crashes, fatal errors</td></tr>
+          <tr><td><strong>Warnings</strong></td><td>[WARN] events, discarded time, memory issues</td></tr>
+          <tr><td><strong>Screenshots</strong></td><td>Capture events, uploads, failures</td></tr>
+          <tr><td><strong>Network</strong></td><td>API responses (especially 4xx/5xx), connection issues</td></tr>
+          <tr><td><strong>Locations</strong></td><td>Geofence events, permission states, GPS coordinates</td></tr>
+          <tr><td><strong>Tracking</strong></td><td>Start/stop, idle, resume, discard events</td></tr>
+        </table>
 
-      <h3>Key things to look for</h3>
-      <ul>
-        <li><code>main_watchdog hit</code> - App is freezing/hanging</li>
-        <li><code>Helper died</code> - Browser extension crashed</li>
-        <li><code>Discard=</code> - Time was rejected</li>
-        <li><code>Response: 4xx/5xx</code> - Server errors</li>
-        <li><code>OS Memory</code> - Low memory warnings</li>
-      </ul>
+        <h3>Built-in Noise Filter</h3>
+        <p>Enabled by default, this removes routine log lines that don't help with debugging:</p>
+        <ul>
+          <li><code>WindowsInput.cpp</code> - Mouse/keyboard coordinates</li>
+          <li><code>Heart beat</code> - Keep-alive messages</li>
+          <li><code>Response: 200/201/204</code> - Successful API calls</li>
+          <li><code>StorageIO.*Wrote</code> - Routine database writes</li>
+        </ul>
+        <p>Uncheck "Auto-filter noise" if you need to see all raw log lines.</p>
 
-      <h3>Search tips</h3>
-      <p>Use the search box to find specific patterns:</p>
-      <ul>
-        <li><code>error</code> - Find all error mentions</li>
-        <li><code>URL:</code> - Find tracked URLs</li>
-        <li><code>screenshot</code> - Find screenshot events</li>
-        <li><code>Discard</code> - Find rejected time</li>
-      </ul>
-      <h3>iOS Location Troubleshooting</h3>
-      <p>For iOS location/job site issues, check these settings:</p>
-      <ul>
-        <li><strong>Location Services:</strong> Settings → Privacy & Security → Location Services → ON</li>
-        <li><strong>Hubstaff Permission:</strong> Settings → Hubstaff → Location → <code>Always</code></li>
-        <li><strong>Precise Location:</strong> Settings → Hubstaff → Precise Location → ON</li>
-        <li><strong>Background Refresh:</strong> Settings → General → Background App Refresh → Hubstaff → ON</li>
-      </ul>
-      <p><strong>Important:</strong> "While Using" permission is NOT sufficient - Hubstaff requires "Always" to track locations in the background.</p>
+        <h3>Privacy</h3>
+        <div class="help-callout success">
+          <strong>🔒 100% Local Processing</strong><br>
+          All analysis happens in your browser. No data is ever sent to any server. Click "Clear" or close the tab to wipe all data from memory.
+        </div>
+      </div>
 
-      <h3>Android Location Troubleshooting</h3>
-      <ul>
-        <li><strong>Location Permission:</strong> Settings → Apps → Hubstaff → Permissions → Location → "Allow all the time"</li>
-        <li><strong>Location Mode:</strong> Enable "High accuracy" mode (GPS + Network)</li>
-        <li><strong>Battery Optimization:</strong> Settings → Apps → Hubstaff → Battery → "Unrestricted"</li>
-      </ul>
-      <p><strong>Brand-specific battery settings (CRITICAL):</strong></p>
-      <ul>
-        <li><strong>Samsung:</strong> Device Care → Battery → App power management → Hubstaff → Unrestricted. Also check "Sleeping apps" and "Deep sleeping apps" lists - remove Hubstaff from both.</li>
-        <li><strong>Xiaomi/MIUI:</strong> Settings → Apps → Manage Apps → Hubstaff → Autostart ON, and Settings → Battery → Hubstaff → No restrictions</li>
-        <li><strong>Huawei:</strong> Settings → Battery → App Launch → Hubstaff → Manually Manage with all toggles ON</li>
-        <li><strong>OnePlus:</strong> Settings → Battery → Battery Optimization → Hubstaff → Don't optimize</li>
-        <li><strong>OPPO/Realme:</strong> Settings → App Management → Hubstaff → Allow Auto-start + disable battery optimization</li>
-      </ul>
-      <p><strong>Common Android Issues:</strong></p>
-      <ul>
-        <li><strong>"Timer could not be started":</strong> User is not at a job site but organization requires it. Check GPS signal and job site radius settings.</li>
-        <li><strong>App keeps closing:</strong> Battery optimization is killing the app. Follow brand-specific steps above.</li>
-        <li><strong>No data syncing:</strong> Check internet connection. Try switching between WiFi and mobile data.</li>
-      </ul>
+      <!-- INTERFACE SECTION -->
+      <div class="help-section" id="help-interface">
+        <h3>KPI Dashboard</h3>
+        <table class="help-table">
+          <tr><th>Metric</th><th>What It Means</th></tr>
+          <tr><td><strong>Total Lines</strong></td><td>Number of log lines analyzed</td></tr>
+          <tr><td><strong>Errors</strong></td><td>Count of ERROR-level events</td></tr>
+          <tr><td><strong>Warnings</strong></td><td>Count of WARN-level events</td></tr>
+          <tr><td><strong>Tracked Time</strong></td><td>Actual time between START and STOP events</td></tr>
+          <tr><td><strong>Idle Kept</strong></td><td>Idle time the user chose to keep</td></tr>
+          <tr><td><strong>Idle Discarded</strong></td><td>Idle time that was rejected</td></tr>
+        </table>
 
-      <h3>Primary Device</h3>
-      <p>Only the <strong>primary device</strong> can record locations and trigger job site automations. If you see "not primary" errors:</p>
-      <ul>
-        <li>The user logged into a newer device, making the old one non-primary</li>
-        <li>A banner should appear on the Timer screen to "Make Primary"</li>
-        <li>Check Admin → User page to see which device is currently primary</li>
-      </ul>
+        <h3>Controls</h3>
+        <table class="help-table">
+          <tr><th>Control</th><th>Purpose</th></tr>
+          <tr><td><strong>Auto-filter noise</strong></td><td>Remove routine log lines that don't help diagnose issues</td></tr>
+          <tr><td><strong>Plain English mode</strong></td><td>Show translated explanations instead of raw technical data</td></tr>
+          <tr><td><strong>Show DEBUG/TRACE</strong></td><td>Include verbose logging levels (rarely needed)</td></tr>
+          <tr><td><strong>Show user's timezone</strong></td><td>Convert timestamps to customer's local time (marked with ★)</td></tr>
+          <tr><td><strong>Filter dates</strong></td><td>Narrow results to a specific date range</td></tr>
+        </table>
 
-      <h3>Job Site Detection Issues</h3>
-      <p>If job sites aren't being detected properly:</p>
-      <ul>
-        <li>Increase job site radius to 100-150m (especially for indoor locations)</li>
-        <li>Check if user has good GPS signal (outdoor, clear sky view)</li>
-        <li>Verify the job site is correctly placed on the map</li>
-        <li>Look for <code>[Site] Region</code> and <code>[Position]</code> entries in logs</li>
-      </ul>
+        <h3>Search Tips</h3>
+        <p>The search box searches <strong>all</strong> log lines, including filtered ones:</p>
+        <ul>
+          <li><code>error</code> - All error mentions</li>
+          <li><code>URL:</code> - Tracked websites</li>
+          <li><code>screenshot</code> - Screen capture events</li>
+          <li><code>Discard</code> - Rejected time</li>
+          <li><code>watchdog</code> - App freeze events</li>
+          <li><code>Response: 5</code> - Server errors (5xx)</li>
+        </ul>
+      </div>
+
+      <!-- IDLE TIME SECTION -->
+      <div class="help-section" id="help-idle">
+        <h3>Idle Time Decisions Table</h3>
+        <p>This table shows <strong>every idle prompt response</strong> with full details. Use it when a customer claims they clicked "Yes" to keep idle time.</p>
+        
+        <table class="help-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td><strong>Time</strong></td><td>When the user responded to the idle prompt</td></tr>
+          <tr><td><strong>Idle Duration</strong></td><td>How long the user was idle before responding</td></tr>
+          <tr><td><strong>Response Time</strong></td><td>How many seconds the user took to answer</td></tr>
+          <tr><td><strong>User Action</strong></td><td>What the user chose (KEPT, DISCARDED, etc.)</td></tr>
+          <tr><td><strong>Raw Values</strong></td><td>The actual KeepIdle/StopTracking values from the log</td></tr>
+        </table>
+
+        <h4>User Action Types</h4>
+        <table class="help-table">
+          <tr><th>Display</th><th>Raw Values</th><th>Meaning</th></tr>
+          <tr><td>✅ KEPT</td><td><code>KeepIdle: 1 / StopTracking: 0</code></td><td>User clicked YES to keep idle time</td></tr>
+          <tr><td>❌ DISCARDED</td><td><code>KeepIdle: 0 / StopTracking: 0</code></td><td>User clicked NO but continued tracking</td></tr>
+          <tr><td>🛑 DISCARDED + STOPPED</td><td><code>KeepIdle: 0 / StopTracking: 1</code></td><td>User clicked NO and stopped tracking</td></tr>
+        </table>
+
+        <div class="help-callout warning">
+          <strong>⚠️ 1-Hour Limit</strong><br>
+          If idle duration exceeds 1 hour, a warning badge appears. Idle time over 1 hour <strong>cannot be kept</strong> regardless of user choice - this is a system limitation.
+        </div>
+
+        <h4>Investigating "I Clicked Yes But Time Wasn't Kept"</h4>
+        <ol>
+          <li>Find the date/time in the Idle Time Decisions table</li>
+          <li>Check the <strong>Raw Values</strong> column</li>
+          <li>If <code>KeepIdle: 1</code> → Client recorded YES correctly. Issue is server-side.</li>
+          <li>If <code>KeepIdle: 0</code> → User actually clicked NO (or prompt timed out)</li>
+          <li>If <strong>>1hr badge</strong> shows → Time exceeded limit, can't be kept even with YES</li>
+        </ol>
+      </div>
+
+      <!-- SESSIONS SECTION -->
+      <div class="help-section" id="help-sessions">
+        <h3>Tracking Sessions</h3>
+        <p>The sessions table shows each START/STOP pair with duration and stop reason.</p>
+
+        <h4>Stop Reasons</h4>
+        <table class="help-table">
+          <tr><th>Stop Reason</th><th>Meaning</th><th>Problem?</th></tr>
+          <tr><td><strong>User stopped</strong></td><td>Normal stop, logged as user-initiated</td><td>No</td></tr>
+          <tr><td><strong>Went idle</strong></td><td>Idle timeout triggered</td><td>No</td></tr>
+          <tr><td><strong>⚠️ Crashed</strong></td><td>No stop event found, app likely crashed</td><td>Yes - investigate</td></tr>
+          <tr><td><strong>Config/Limit</strong></td><td>Policy stopped tracking (time limit, schedule)</td><td>Check settings</td></tr>
+          <tr><td><strong>📍 Left Job Site</strong></td><td>User exited geofenced area</td><td>Expected if rules active</td></tr>
+          <tr><td><strong>App closed</strong></td><td>App was shut down normally</td><td>No</td></tr>
+        </table>
+
+        <div class="help-callout">
+          <strong>What "User stopped" Does NOT Mean</strong><br>
+          ❌ Does NOT mean the app crashed<br>
+          ❌ Does NOT mean there was an error<br>
+          ❌ Does NOT mean timezone issues caused it<br>
+          If user disputes stopping manually: consider accidental click, trackpad sensitivity, or another person with access.
+        </div>
+      </div>
+
+      <!-- JOB SITES SECTION -->
+      <div class="help-section" id="help-jobsites">
+        <h3>Job Site Analysis</h3>
+        <p>When job site data is present, you'll see configured sites, user location, and visit history with map links.</p>
+
+        <h4>Visit History</h4>
+        <p>Each entry shows:</p>
+        <ul>
+          <li>User's GPS coordinates at the time</li>
+          <li>Distance to nearest configured site</li>
+          <li>Whether inside or outside the radius</li>
+          <li><strong>Map links</strong> to view in Google Maps</li>
+        </ul>
+
+        <h4>Recommended Job Site Radius</h4>
+        <table class="help-table">
+          <tr><th>Scenario</th><th>Recommended Radius</th></tr>
+          <tr><td>Outdoor work</td><td>50-100m</td></tr>
+          <tr><td>Indoor office</td><td>100-150m</td></tr>
+          <tr><td>Large facility</td><td>150-200m</td></tr>
+          <tr><td>Poor GPS area</td><td>200m+</td></tr>
+        </table>
+
+        <div class="help-callout warning">
+          <strong>⚠️ Radius ≤50m Warning</strong><br>
+          Job sites with very small radii often fail due to GPS accuracy limitations, especially indoors.
+        </div>
+
+        <h4>Primary Device</h4>
+        <p>Only the <strong>primary device</strong> can record locations and trigger job site automations. If you see "not primary" errors:</p>
+        <ul>
+          <li>User logged into a newer device, making the old one non-primary</li>
+          <li>A banner should appear on Timer screen to "Make Primary"</li>
+        </ul>
+      </div>
+
+      <!-- iOS SECTION -->
+      <div class="help-section" id="help-ios">
+        <h3>iOS Location Troubleshooting</h3>
+        <h4>Required Settings</h4>
+        <ol>
+          <li><strong>Location Services:</strong> Settings → Privacy & Security → Location Services → ON</li>
+          <li><strong>Hubstaff Permission:</strong> Settings → Hubstaff → Location → <code>Always</code></li>
+          <li><strong>Precise Location:</strong> Settings → Hubstaff → Precise Location → ON</li>
+          <li><strong>Background Refresh:</strong> Settings → General → Background App Refresh → Hubstaff → ON</li>
+        </ol>
+
+        <div class="help-callout danger">
+          <strong>⚠️ "While Using" Is NOT Sufficient</strong><br>
+          Hubstaff requires "Always" permission to track locations in the background. "While Using" will cause job sites to fail.
+        </div>
+
+        <h4>Common iOS Log Patterns</h4>
+        <table class="help-table">
+          <tr><th>Pattern</th><th>Meaning</th></tr>
+          <tr><td><code>kCLErrorDomain Code=1</code></td><td>Location permission denied</td></tr>
+          <tr><td><code>kCLErrorDomain Code=0</code></td><td>Location unknown/unavailable</td></tr>
+          <tr><td><code>Background Refresh: OFF</code></td><td>Background app refresh disabled</td></tr>
+        </table>
+      </div>
+
+      <!-- ANDROID SECTION -->
+      <div class="help-section" id="help-android">
+        <h3>Android Location Troubleshooting</h3>
+        <h4>Required Settings</h4>
+        <ol>
+          <li><strong>Location Permission:</strong> Settings → Apps → Hubstaff → Permissions → Location → "Allow all the time"</li>
+          <li><strong>Location Mode:</strong> Enable "High accuracy" mode</li>
+          <li><strong>Battery Optimization:</strong> Settings → Apps → Hubstaff → Battery → "Unrestricted"</li>
+        </ol>
+
+        <h4>Brand-Specific Battery Settings (CRITICAL)</h4>
+        <table class="help-table">
+          <tr><th>Brand</th><th>Steps</th></tr>
+          <tr><td><strong>Samsung</strong></td><td>Device Care → Battery → App power management → Hubstaff → Unrestricted. Remove from "Sleeping apps" AND "Deep sleeping apps"</td></tr>
+          <tr><td><strong>Xiaomi/MIUI</strong></td><td>Apps → Manage Apps → Hubstaff → Autostart ON. Battery → Hubstaff → No restrictions</td></tr>
+          <tr><td><strong>Huawei</strong></td><td>Battery → App Launch → Hubstaff → Manually Manage with all toggles ON</td></tr>
+          <tr><td><strong>OnePlus</strong></td><td>Battery → Battery Optimization → Hubstaff → Don't optimize</td></tr>
+          <tr><td><strong>OPPO/Realme</strong></td><td>App Management → Hubstaff → Allow Auto-start + disable battery optimization</td></tr>
+        </table>
+
+        <h4>Common Android Log Patterns</h4>
+        <table class="help-table">
+          <tr><th>Pattern</th><th>Meaning</th></tr>
+          <tr><td><code>isIgnoringBatteryOptimization: false</code></td><td>Battery optimization is ON (bad)</td></tr>
+          <tr><td><code>BACKGROUND_LOCATION enabled=false</code></td><td>Background location not granted</td></tr>
+          <tr><td><code>TRACKING_NOT_STARTED</code></td><td>Timer blocked - not at required job site</td></tr>
+          <tr><td><code>non-primary device</code></td><td>Different device is set as primary</td></tr>
+        </table>
+      </div>
+
+      <!-- DESKTOP SECTION -->
+      <div class="help-section" id="help-desktop">
+        <h3>Windows/Mac/Linux Desktop</h3>
+        <h4>Common Issues</h4>
+        <table class="help-table">
+          <tr><th>Pattern</th><th>Meaning</th><th>Solution</th></tr>
+          <tr><td><code>main_watchdog hit</code></td><td>App froze/became unresponsive</td><td>Check system resources, restart app</td></tr>
+          <tr><td><code>Helper died</code></td><td>Browser extension crashed</td><td>Reinstall extension, restart browser</td></tr>
+          <tr><td><code>Response: 401</code></td><td>Authentication failed</td><td>User needs to re-login</td></tr>
+          <tr><td><code>Could not resolve host</code></td><td>No internet connection</td><td>Check network connectivity</td></tr>
+        </table>
+
+        <h4>Brave Browser</h4>
+        <div class="help-callout warning">
+          <strong>⚠️ URL Tracking Not Supported in Brave</strong><br>
+          Hubstaff cannot track URLs in Brave Browser. The app name will be tracked, but visited URLs will not appear in reports. For URL tracking, use Chrome, Edge, Firefox, or Island Browser.
+        </div>
+
+        <h4>Mac Permissions</h4>
+        <p>If URL or screenshot tracking isn't working on Mac:</p>
+        <ul>
+          <li><strong>Screen Recording:</strong> System Settings → Privacy & Security → Screen Recording → Enable Hubstaff</li>
+          <li><strong>Accessibility:</strong> System Settings → Privacy & Security → Accessibility → Enable Hubstaff</li>
+          <li><strong>Automation:</strong> System Settings → Privacy & Security → Automation → Enable Hubstaff for browsers</li>
+        </ul>
+      </div>
+
+      <!-- LOG PATTERNS SECTION -->
+      <div class="help-section" id="help-patterns">
+        <h3>Key Log Patterns Cheat Sheet</h3>
+        <table class="help-table">
+          <tr><th>Pattern</th><th>Meaning</th></tr>
+          <tr><td><code>[ERROR]</code></td><td>Something went wrong</td></tr>
+          <tr><td><code>[WARN]</code></td><td>Potential issue</td></tr>
+          <tr><td><code>main_watchdog hit</code></td><td>App froze</td></tr>
+          <tr><td><code>Helper died</code></td><td>Browser extension crashed</td></tr>
+          <tr><td><code>Response: 4xx</code></td><td>Client error (auth, not found)</td></tr>
+          <tr><td><code>Response: 5xx</code></td><td>Server error (outage)</td></tr>
+          <tr><td><code>Discard=1</code></td><td>Time was rejected</td></tr>
+          <tr><td><code>STARTUP_UNCLEAN</code></td><td>App crashed or was killed</td></tr>
+          <tr><td><code>KeepIdle: 1</code></td><td>User chose to keep idle time</td></tr>
+          <tr><td><code>KeepIdle: 0</code></td><td>User chose to discard idle time</td></tr>
+        </table>
+
+        <h3>Plain English Translations</h3>
+        <p>When Plain English mode is enabled, common patterns are translated:</p>
+        <table class="help-table">
+          <tr><th>Technical Log</th><th>Plain English</th></tr>
+          <tr><td><code>main_watchdog hit</code></td><td>⚠️ The app froze or became unresponsive</td></tr>
+          <tr><td><code>Helper died</code></td><td>🔌 The browser extension crashed</td></tr>
+          <tr><td><code>Response: 401</code></td><td>🔐 Authentication failed - user may be logged out</td></tr>
+          <tr><td><code>kCLErrorDomain Code=1</code></td><td>📍 iOS Location Permission Denied</td></tr>
+          <tr><td><code>TRACKING_NOT_STARTED</code></td><td>🚫 Timer Blocked - Not At Required Job Site</td></tr>
+        </table>
+
+        <h3>Workflow for Log Analysis</h3>
+        <ol>
+          <li>Paste logs and click Analyze</li>
+          <li>Check <strong>Root Cause Analysis</strong> box first (if Plain English mode is on)</li>
+          <li>Review <strong>Quick Summary</strong> for prioritized findings</li>
+          <li>Check <strong>Device Dashboard</strong> (Android) for permission/setting issues</li>
+          <li>Review <strong>Tracking Sessions</strong> to understand what was tracked</li>
+          <li>Check <strong>Idle Time Decisions</strong> if user disputes idle choices</li>
+          <li>Use <strong>Search</strong> for specific patterns if needed</li>
+          <li>Check <strong>Visit History</strong> for job site issues with map links</li>
+        </ol>
+      </div>
+
     </div>
   </div>
 
@@ -3996,9 +4234,22 @@ $('appsCount').textContent = actualAppsCount;
       content.classList.remove('collapsed');
     }
 
+    // Help Guide functionality
     $('helpBtn').onclick = () => $('helpModal').classList.add('visible');
+    $('helpGuideBtn').onclick = () => $('helpModal').classList.add('visible');
     $('closeHelp').onclick = () => $('helpModal').classList.remove('visible');
     $('helpModal').onclick = e => { if (e.target === $('helpModal')) $('helpModal').classList.remove('visible'); };
+
+    // Help Guide navigation
+    document.querySelectorAll('.help-nav-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.help-nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.help-section').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        const section = document.getElementById('help-' + btn.dataset.section);
+        if (section) section.classList.add('active');
+      };
+    });
 
     $('privacyBtn').onclick = () => $('privacyModal').classList.add('visible');
     $('closePrivacy').onclick = () => $('privacyModal').classList.remove('visible');
