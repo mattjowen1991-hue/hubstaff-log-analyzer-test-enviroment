@@ -846,9 +846,9 @@
         </div>
         <div style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
           <div class="section-title" style="margin-bottom:8px;"><span>💤</span> Idle Time Decisions</div>
-          <div class="table-wrap" style="max-height:200px;">
+          <div class="table-wrap" style="max-height:300px;">
             <table>
-              <thead><tr><th>Time</th><th>Idle Duration</th><th>Decision</th></tr></thead>
+              <thead><tr><th>Time</th><th>Idle Duration</th><th>Response Time</th><th>User Action</th><th>Raw Values</th></tr></thead>
               <tbody id="idleBody"></tbody>
             </table>
           </div>
@@ -3137,26 +3137,53 @@ if (!showTrace && level === 'TRACE') continue;
         }
         
         // Capture idle decisions (KeepIdle / StopTracking)
-        if (line.includes('KeepIdle') || line.includes('StopTracking')) {
+        if (line.includes('KeepIdle') && line.includes('StopTracking')) {
           const keepMatch = line.match(/KeepIdle[:\s]+(\d+)/i);
           const stopMatch = line.match(/StopTracking[:\s]+(\d+)/i);
+          const responseTimeMatch = line.match(/after\s+(\d+)\s+seconds?\s+with/i);
           
-          const kept = keepMatch && keepMatch[1] === '1';
-          const discarded = stopMatch && stopMatch[1] === '1';
+          const keepIdle = keepMatch ? keepMatch[1] === '1' : false;
+          const stopTracking = stopMatch ? stopMatch[1] === '1' : false;
+          const responseTimeSecs = responseTimeMatch ? parseInt(responseTimeMatch[1]) : null;
           
-          if (kept || discarded) {
-            const idleSecs = lastIdleWakeSecs || 0;
-            data.idleDecisions.push({
-              ts: ts,
-              seconds: idleSecs,
-              decision: kept ? 'KEPT' : 'DISCARDED'
-            });
-            
-            if (kept) data.idleKeptSecs += idleSecs;
-            else if (discarded) data.idleDiscardedSecs += idleSecs;
-            
-            lastIdleWakeSecs = null;
+          const idleSecs = lastIdleWakeSecs || 0;
+          const exceeds1Hour = idleSecs > 3600;
+          
+          // Determine the decision type
+          // KeepIdle: 1 / StopTracking: 0 = User chose to KEEP idle time
+          // KeepIdle: 0 / StopTracking: 1 = User chose to DISCARD and STOP tracking
+          // KeepIdle: 0 / StopTracking: 0 = User chose to DISCARD idle but CONTINUE tracking
+          let decision, decisionDetail;
+          if (keepIdle) {
+            decision = 'KEPT';
+            decisionDetail = 'User clicked YES to keep idle time';
+          } else if (stopTracking) {
+            decision = 'DISCARDED_STOPPED';
+            decisionDetail = 'User clicked NO and stopped tracking';
+          } else {
+            decision = 'DISCARDED_CONTINUED';
+            decisionDetail = 'User clicked NO but continued tracking';
           }
+          
+          data.idleDecisions.push({
+            ts: ts,
+            seconds: idleSecs,
+            decision: decision,
+            decisionDetail: decisionDetail,
+            keepIdle: keepIdle,
+            stopTracking: stopTracking,
+            responseTimeSecs: responseTimeSecs,
+            exceeds1Hour: exceeds1Hour,
+            rawValues: `KeepIdle: ${keepIdle ? '1' : '0'} / StopTracking: ${stopTracking ? '1' : '0'}`
+          });
+          
+          if (keepIdle) {
+            data.idleKeptSecs += idleSecs;
+          } else {
+            data.idleDiscardedSecs += idleSecs;
+          }
+          
+          lastIdleWakeSecs = null;
         }
 
         // Errors
@@ -3516,18 +3543,41 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // === RENDER IDLE DECISIONS TABLE ===
       if (data.idleDecisions.length > 0) {
         $('idleBody').innerHTML = data.idleDecisions.map(d => {
-          const decisionCls = d.decision === 'KEPT' ? 'success' : 'warn';
-          const decisionText = plainMode ? 
-            (d.decision === 'KEPT' ? '✅ Kept the time' : '❌ Discarded') : 
-            d.decision;
+          // Determine display class and text based on decision
+          let decisionCls, actionText, actionIcon;
+          if (d.decision === 'KEPT') {
+            decisionCls = 'success';
+            actionIcon = '✅';
+            actionText = 'KEPT - User clicked YES';
+          } else if (d.decision === 'DISCARDED_STOPPED') {
+            decisionCls = 'error';
+            actionIcon = '🛑';
+            actionText = 'DISCARDED + STOPPED tracking';
+          } else {
+            decisionCls = 'warn';
+            actionIcon = '❌';
+            actionText = 'DISCARDED - User clicked NO';
+          }
+          
+          // Add warning if exceeds 1 hour (idle time can't be kept)
+          let durationNote = '';
+          if (d.exceeds1Hour) {
+            durationNote = ' <span style="color:var(--danger);font-size:10px;" title="Idle time exceeding 1 hour cannot be kept">⚠️ >1hr</span>';
+          }
+          
+          // Response time (how long user took to answer the dialog)
+          const responseTime = d.responseTimeSecs ? `${d.responseTimeSecs}s` : '—';
+          
           return `<tr>
             <td>${fmtTime(d.ts)}</td>
-            <td>${fmtDuration(d.seconds)}</td>
-            <td><span class="tag ${decisionCls}">${decisionText}</span></td>
+            <td>${fmtDuration(d.seconds)}${durationNote}</td>
+            <td style="color:var(--muted)">${responseTime}</td>
+            <td><span class="tag ${decisionCls}">${plainMode ? (actionIcon + ' ' + actionText) : d.decision}</span></td>
+            <td style="font-family:monospace;font-size:10px;color:var(--muted)">${d.rawValues || '—'}</td>
           </tr>`;
         }).join('');
       } else {
-        $('idleBody').innerHTML = '<tr><td colspan="3" style="color:var(--muted)">No idle decisions recorded</td></tr>';
+        $('idleBody').innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No idle decisions recorded</td></tr>';
       }
 
       // Errors
