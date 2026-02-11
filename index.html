@@ -1100,12 +1100,13 @@
           <p>This occurs when Hubstaff detects activity happened but couldn't identify the source via normal detection methods. Since the source is unknown, activity is "simulated" for both mouse and keyboard.</p>
           <p><strong>🔧 Common causes of simulated input:</strong></p>
           <ul>
-            <li>Drawing tablets / graphics tablets (Wacom, XP-Pen, etc.)</li>
-            <li>Stylus pens / touchscreens</li>
-            <li>Non-standard mice or keyboards</li>
-            <li>KVM switches</li>
-            <li>USB hubs or docking stations causing device recognition issues</li>
-            <li>Some gaming peripherals</li>
+            <li>Drawing tablets / graphics tablets (Wacom, XP-Pen, Huion, etc.)</li>
+<li>Stylus pens / touchscreens</li>
+<li>Gaming mice or keyboards with high polling rates (1000Hz+)</li>
+<li>Gaming peripherals with custom drivers or software (Razer, Logitech G, Corsair, etc.)</li>
+<li>Non-standard mice or keyboards</li>
+<li>KVM switches</li>
+<li>USB hubs or docking stations causing device recognition issues</li>>
           </ul>
           <p><strong>🛠️ Troubleshooting high activity from simulated input:</strong></p>
           <ol>
@@ -1245,7 +1246,8 @@
           <tr><td><strong>Network</strong></td><td>API responses (especially 4xx/5xx), connection issues</td></tr>
           <tr><td><strong>Locations</strong></td><td>Geofence events, permission states, GPS coordinates</td></tr>
           <tr><td><strong>Tracking</strong></td><td>Start/stop, idle, resume, discard events</td></tr>
-        </table>
+<tr><td><strong>Injected/Simulated Input</strong></td><td>"Simulating missed input" events indicating hardware recognition issues</td></tr>
+</table>
 
         <h3>Built-in Noise Filter</h3>
         <p>Enabled by default, this removes routine log lines that don't help with debugging:</p>
@@ -1254,10 +1256,22 @@
           <li><code>Heart beat</code> - Keep-alive messages</li>
           <li><code>Response: 200/201/204</code> - Successful API calls</li>
           <li><code>StorageIO.*Wrote</code> - Routine database writes</li>
-        </ul>
-        <p>Uncheck "Auto-filter noise" if you need to see all raw log lines.</p>
+</ul>
+<div class="help-callout">
+  <strong>💡 Exception:</strong> "Simulating missed input" lines are always kept even though they come from <code>WindowsInput.cpp</code>. These indicate hardware that Hubstaff can't properly recognize (drawing tablets, gaming peripherals, KVM switches, etc.) and can cause unexpectedly high activity levels.
+</div>
+<p>Uncheck "Auto-filter noise" if you need to see all raw log lines.</p>
 
-        <h3>Privacy</h3>
+<h3>Simulated Input Detection</h3>
+<p>The analyzer detects "Simulating missed input" events which occur when Hubstaff sees activity but can't identify the source device. This is important because:</p>
+<ul>
+  <li>It can cause <strong>artificially high activity rates</strong> (90%+)</li>
+  <li>It's usually a <strong>hardware issue, not cheating</strong></li>
+  <li>Common causes: drawing tablets, gaming mice/keyboards, touchscreens, KVM switches</li>
+</ul>
+<p><strong>Troubleshooting:</strong> Have the user disconnect all devices except a basic mouse and keyboard, monitor activity for 10 minutes, then reconnect devices one-by-one to isolate the culprit.</p>
+
+<h3>Privacy</h3>
         <div class="help-callout success">
           <strong>🔒 100% Local Processing</strong><br>
           All analysis happens in your browser. No data is ever sent to any server. Click "Clear" or close the tab to wipe all data from memory.
