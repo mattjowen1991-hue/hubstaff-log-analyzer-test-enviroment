@@ -1018,7 +1018,7 @@
 
     <div class="collapsible-section">
       <div class="collapsible-header collapsed" onclick="toggleSection('injected')">
-        <h3><span>🤖</span> Injected Input Activity</h3>
+        <h3><span>🤖</span> Injected / Simulated Input Activity</h3>
         <div class="header-meta">
           <span class="badge" id="injectedCount">0</span>
           <span class="chevron">▼</span>
@@ -1026,15 +1026,33 @@
       </div>
       <div class="collapsible-content collapsed" id="injectedContent">
         <div id="injectedExplainer" class="explainer-box">
-          <h4>What is "Injected Input"?</h4>
+          <h4>What is "Injected Input" and "Simulated Input"?</h4>
           <p>Windows can detect when keyboard/mouse input comes from software rather than physical devices:</p>
           <ul>
             <li><strong>Real input (R)</strong> - Actual keyboard/mouse from the user</li>
             <li><strong>Injected input (I)</strong> - Software-generated input from another process</li>
             <li><strong>Low-integrity injected (LI)</strong> - Input from unverified/untrusted sources</li>
           </ul>
-          <p><strong>Common legitimate causes:</strong> Remote desktop, accessibility tools, automation software, gaming mice/keyboards with macros, screen sharing.</p>
-          <p><strong>⚠️ Note:</strong> Injected input is NOT automatically cheating. Many legitimate tools inject input. Look for patterns like: consistently 100% activity, same screenshots repeating, or injected input with zero real input.</p>
+          <h4 style="margin-top:12px;">What is "Simulating missed input"?</h4>
+          <p>This occurs when Hubstaff detects activity happened but couldn't identify the source via normal detection methods. Since the source is unknown, activity is "simulated" for both mouse and keyboard.</p>
+          <p><strong>🔧 Common causes of simulated input:</strong></p>
+          <ul>
+            <li>Drawing tablets / graphics tablets (Wacom, XP-Pen, etc.)</li>
+            <li>Stylus pens / touchscreens</li>
+            <li>Non-standard mice or keyboards</li>
+            <li>KVM switches</li>
+            <li>USB hubs or docking stations causing device recognition issues</li>
+            <li>Some gaming peripherals</li>
+          </ul>
+          <p><strong>🛠️ Troubleshooting high activity from simulated input:</strong></p>
+          <ol>
+            <li>Ask the user to list ALL connected devices (including tablets, pens, touchscreens)</li>
+            <li>Have them disconnect all devices except mouse and keyboard</li>
+            <li>Monitor activity levels for 10 minutes</li>
+            <li>Reconnect devices one by one, checking activity after each</li>
+            <li>This isolates which device is causing the issue</li>
+          </ol>
+          <p><strong>⚠️ Note:</strong> Injected/simulated input is NOT automatically cheating. Check screenshots for legitimacy - if screenshots show real work, it's likely a hardware issue rather than manipulation.</p>
         </div>
         <div class="table-wrap" style="max-height:250px;">
           <table>
@@ -2932,22 +2950,40 @@
 
       // === INJECTED INPUT ===
       if (data.injected.length > 0) {
-        const onlyInjected = data.injected.filter(e => e.msg.toLowerCase().includes('only injected'));
-        const simulated = data.injected.filter(e => e.msg.toLowerCase().includes('simulated'));
+        const onlyInjected = data.injected.filter(e => e.onlyInjected === true || e.msg.toLowerCase().includes('only injected'));
+        const simulated = data.injected.filter(e => e.inputType === 'simulated' || e.msg.toLowerCase().includes('simulating missed input'));
+        const regularInjected = data.injected.filter(e => e.inputType === 'injected' && !e.onlyInjected);
         
-        let desc = `Detected ${data.injected.length} injected/simulated input event${data.injected.length > 1 ? 's' : ''}.`;
-        if (onlyInjected.length > 0) desc += ` ${onlyInjected.length} showed ONLY injected input (no real input).`;
+        // Separate findings for simulated vs injected
+        if (simulated.length > 0) {
+          findings.push({
+            severity: simulated.length > 50 ? 'warning' : 'info',
+            icon: '🔌',
+            title: `Simulated Input: ${simulated.length} Events`,
+            description: `Detected ${simulated.length} "Simulating missed input" event${simulated.length > 1 ? 's' : ''}. <strong>This means Hubstaff detected activity but couldn't identify the source device.</strong> This typically indicates a hardware recognition issue, not cheating.`,
+            action: simulated.length > 50 ? 
+              '<strong>Likely hardware issue causing high activity.</strong> Ask the user to: 1) List ALL connected devices (drawing tablets, stylus pens, touchscreens, KVM switches, USB hubs), 2) Disconnect all except mouse/keyboard, 3) Monitor activity for 10 mins, 4) Reconnect devices one-by-one to isolate the problem device.' :
+              'Some simulated input detected. If activity rates seem unusually high, check for drawing tablets, touchscreens, or unusual peripherals.',
+            techDetail: `Common causes: Drawing tablets (Wacom, XP-Pen), stylus/touchscreens, KVM switches, USB hubs, non-standard mice.\n\nSample events:\n` + simulated.slice(0,3).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,80)}`).join('\n')
+          });
+        }
         
-        findings.push({
-          severity: onlyInjected.length > 10 ? 'warning' : 'info',
-          icon: '🤖',
-          title: `Injected Input: ${data.injected.length} Events`,
-          description: desc + ` <strong>Common causes:</strong> Remote desktop, accessibility tools, automation software, gaming peripherals with macros.`,
-          action: onlyInjected.length > 10 ? 
-            'High number of "only injected" events. Check if user is using remote desktop or automation tools. Review screenshots for patterns.' : 
-            'Some injected input detected. This is often normal - check the Injected Input section for details.',
-          techDetail: data.injected.slice(0,5).map(e => `${fmtTime(e.ts)}: ${e.msg.slice(0,80)}`).join('\n')
-        });
+        if (onlyInjected.length > 0 || regularInjected.length > 0) {
+          const injectedTotal = onlyInjected.length + regularInjected.length;
+          let desc = `Detected ${injectedTotal} injected input event${injectedTotal > 1 ? 's' : ''}.`;
+          if (onlyInjected.length > 0) desc += ` <strong>${onlyInjected.length} showed ONLY injected input (no real input alongside)</strong> - this is more suspicious.`;
+          
+          findings.push({
+            severity: onlyInjected.length > 10 ? 'warning' : 'info',
+            icon: '🤖',
+            title: `Injected Input: ${injectedTotal} Events`,
+            description: desc + ` <strong>Common legitimate causes:</strong> Remote desktop, accessibility tools, automation software, gaming peripherals with macros.`,
+            action: onlyInjected.length > 10 ? 
+              'High number of "only injected" events. Check if user is using remote desktop or automation tools. Review screenshots for repeated patterns.' : 
+              'Some injected input detected. This is often normal - check the Injected Input section for details.',
+            techDetail: data.injected.filter(e => e.inputType === 'injected').slice(0,5).map(e => `${fmtTime(e.ts)}: ${e.inputDetail || e.msg.slice(0,80)}`).join('\n')
+          });
+        }
       }
       
       // Check for critical issues
@@ -3522,6 +3558,51 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
   }
 }
 
+        // Injected / Simulated Input Detection
+        // 1. Detect "Simulating missed input" - hardware not recognized properly
+        if (line.includes('Simulating missed input')) {
+          const simMatch = line.match(/Simulating missed input\s*\(([^)]+)\)/);
+          entry.inputType = 'simulated';
+          entry.inputDetail = simMatch ? simMatch[1] : 'Unknown device causing unrecognized input';
+          data.injected.push(entry);
+        }
+        
+        // 2. Detect actual injected input from WindowsInput lines (I>0 or LI>0)
+        // Format: Mouse: clicks/Rmovement/Iinjected/LIlowlevel Keyboard: keys/Rraw/Iinjected/LIlowlevel
+        if (line.includes('WindowsInput.cpp') && line.includes('Mouse:') && line.includes('Keyboard:')) {
+          const inputMatch = line.match(/Mouse:\s*(\d+)\/R(\d+)\/I(\d+)\/LI(\d+)\s+Keyboard:\s*(\d+)\/R(\d+)\/I(\d+)\/LI(\d+)/);
+          if (inputMatch) {
+            const mouseInjected = parseInt(inputMatch[3]);
+            const mouseLowIntegrity = parseInt(inputMatch[4]);
+            const kbInjected = parseInt(inputMatch[7]);
+            const kbLowIntegrity = parseInt(inputMatch[8]);
+            const mouseReal = parseInt(inputMatch[2]);
+            const kbReal = parseInt(inputMatch[6]);
+            
+            // Flag if there's injected input
+            if (mouseInjected > 0 || mouseLowIntegrity > 0 || kbInjected > 0 || kbLowIntegrity > 0) {
+              entry.inputType = 'injected';
+              entry.mouseInjected = mouseInjected;
+              entry.mouseLowIntegrity = mouseLowIntegrity;
+              entry.kbInjected = kbInjected;
+              entry.kbLowIntegrity = kbLowIntegrity;
+              entry.mouseReal = mouseReal;
+              entry.kbReal = kbReal;
+              
+              // Determine if this is "only injected" (no real input alongside)
+              if ((mouseInjected > 0 || mouseLowIntegrity > 0) && mouseReal === 0 && 
+                  (kbInjected > 0 || kbLowIntegrity > 0) && kbReal === 0) {
+                entry.inputDetail = `Only injected - Mouse: I${mouseInjected}/LI${mouseLowIntegrity}, Keyboard: I${kbInjected}/LI${kbLowIntegrity}`;
+                entry.onlyInjected = true;
+              } else {
+                entry.inputDetail = `Injected - Mouse: R${mouseReal}/I${mouseInjected}/LI${mouseLowIntegrity}, Keyboard: R${kbReal}/I${kbInjected}/LI${kbLowIntegrity}`;
+                entry.onlyInjected = false;
+              }
+              data.injected.push(entry);
+            }
+          }
+        }
+
         // Tracking events
         if (line.includes('Resume') || line.includes('Idle') || line.includes('Discard=') || line.includes('Startup') || line.includes('START_TRACKING') || line.includes('STOP_TRACKING')) {
           data.tracking.push(entry);
@@ -4023,17 +4104,42 @@ $('appsCount').textContent = actualAppsCount;
       // Injected Input
       $('injectedBody').innerHTML = data.injected.slice(0, 100).map(e => {
         let type = 'Injected';
-        if (e.msg.toLowerCase().includes('simulated')) type = 'Simulated';
-        else if (e.msg.toLowerCase().includes('partially')) type = 'Partial';
-        else if (e.msg.toLowerCase().includes('only injected')) type = 'Only Injected';
+        let tagClass = 'warn';
+        let displayMsg = e.msg;
+        
+        // Use parsed data if available
+        if (e.inputType === 'simulated') {
+          type = 'Simulated';
+          tagClass = 'info';
+          displayMsg = e.inputDetail || 'Hardware not recognized - input simulated for both mouse and keyboard';
+        } else if (e.inputType === 'injected') {
+          if (e.onlyInjected) {
+            type = 'Only Injected';
+            tagClass = 'danger';
+          } else {
+            type = 'Injected';
+            tagClass = 'warn';
+          }
+          displayMsg = e.inputDetail || e.msg;
+        } else {
+          // Fallback for legacy parsing
+          if (e.msg.toLowerCase().includes('simulating missed input')) {
+            type = 'Simulated';
+            tagClass = 'info';
+          } else if (e.msg.toLowerCase().includes('only injected')) {
+            type = 'Only Injected';
+            tagClass = 'danger';
+          }
+        }
+        
         return `
           <tr>
             <td>${fmtTime(e.ts)}</td>
-            <td><span class="tag warn">${type}</span></td>
-            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
+            <td><span class="tag ${tagClass}">${type}</span></td>
+            <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.msg)}">${escapeHtml(displayMsg)}</td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="3" style="color:var(--success)">✓ No injected input detected</td></tr>';
+      }).join('') || '<tr><td colspan="3" style="color:var(--success)">✓ No injected or simulated input detected</td></tr>';
 
       // Tracking
       $('trackingBody').innerHTML = data.tracking.slice(0, 50).map(e => {
