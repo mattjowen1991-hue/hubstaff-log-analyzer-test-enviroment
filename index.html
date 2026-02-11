@@ -31,6 +31,42 @@
     textarea { width: 100%; height: 150px; background: #050208; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; resize: vertical; position: relative; z-index: 1; }
     textarea:focus { outline: none; border-color: var(--accent-dim); }
 
+    /* File upload styles */
+    .file-upload-area { 
+      border: 2px dashed var(--border); 
+      border-radius: 8px; 
+      padding: 20px; 
+      text-align: center; 
+      margin-bottom: 10px; 
+      transition: all 0.2s;
+      cursor: pointer;
+      background: var(--card);
+    }
+    .file-upload-area:hover { border-color: var(--accent-dim); background: #1a1025; }
+    .file-upload-area.drag-over { border-color: var(--accent); background: rgba(168,85,247,0.1); }
+    .file-upload-area input[type="file"] { display: none; }
+    .file-upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .file-upload-text { color: var(--muted); font-size: 13px; }
+    .file-upload-text strong { color: var(--accent); }
+    .file-upload-hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
+    .file-name-display { color: var(--success); font-size: 12px; margin-top: 8px; display: none; }
+    .file-name-display.visible { display: block; }
+    
+    /* Progress bar */
+    .progress-container { display: none; margin: 10px 0; }
+    .progress-container.visible { display: block; }
+    .progress-bar-bg { background: var(--panel); border-radius: 10px; height: 20px; overflow: hidden; border: 1px solid var(--border); }
+    .progress-bar { background: linear-gradient(90deg, var(--accent-dim), var(--accent)); height: 100%; width: 0%; transition: width 0.1s; border-radius: 10px; }
+    .progress-text { font-size: 11px; color: var(--muted); margin-top: 6px; text-align: center; }
+    
+    /* Input method toggle */
+    .input-method-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+    .input-method-btn { flex: 1; padding: 10px; text-align: center; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 12px; color: var(--muted); transition: all 0.2s; }
+    .input-method-btn:hover { border-color: var(--accent-dim); }
+    .input-method-btn.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+    .input-section { display: none; }
+    .input-section.active { display: block; }
+
     .status { font-size: 12px; color: var(--muted); margin-left: 8px; }
     .status.success { color: var(--success); }
     .status.error { color: var(--danger); }
@@ -753,7 +789,34 @@
         <button id="clearBtn">Clear</button>
         <span class="status" id="status"></span>
       </div>
-      <textarea id="logInput" placeholder="Paste raw hubstaff.log contents here - noise will be filtered automatically..."></textarea>
+      
+      <!-- Input Method Toggle -->
+      <div class="input-method-toggle">
+        <div class="input-method-btn active" id="uploadMethodBtn">📁 Upload File</div>
+        <div class="input-method-btn" id="pasteMethodBtn">📋 Paste Text</div>
+      </div>
+      
+      <!-- File Upload Section -->
+      <div class="input-section active" id="uploadSection">
+        <div class="file-upload-area" id="fileUploadArea">
+          <input type="file" id="fileInput" accept=".log,.txt,.1,.2,.3,.4,.5,.6,.7,.8,.9">
+          <div class="file-upload-icon">📄</div>
+          <div class="file-upload-text"><strong>Click to upload</strong> or drag & drop</div>
+          <div class="file-upload-hint">Supports .log, .txt files (hubstaff.log, hubstaff.1, etc.)</div>
+          <div class="file-name-display" id="fileName"></div>
+        </div>
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar-bg">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-text" id="progressText">Processing...</div>
+        </div>
+      </div>
+      
+      <!-- Paste Text Section -->
+      <div class="input-section" id="pasteSection">
+        <textarea id="logInput" placeholder="Paste raw hubstaff.log contents here - noise will be filtered automatically..."></textarea>
+      </div>
       <div class="toggle-row">
   <label class="has-tooltip"><input type="checkbox" id="autoFilter" checked> Auto-filter noise<span class="tooltip">Removes routine log lines (mouse coordinates, heartbeats, successful API calls) that don't help diagnose issues. Keeps errors, warnings, screenshots, and tracking events. Disable if you need to see every raw log line.</span></label>
   <label class="has-tooltip"><input type="checkbox" id="plainMode" checked> 🎯 Plain English mode<span class="tooltip">Translates technical log messages into plain English explanations with actionable advice. Shows the Root Cause Analysis box and Quick Summary. Disable for raw technical view.</span></label>
@@ -4201,14 +4264,235 @@ $('appsCount').textContent = actualAppsCount;
       }).join('');
     }
 
-    $('analyzeBtn').onclick = () => {
-      const text = $('logInput').value;
-      if (!text.trim()) {
-        $('status').textContent = 'Please paste log content first';
+    // ========== FILE UPLOAD HANDLING ==========
+    let uploadedFileContent = null;
+    
+    // Input method toggle
+    $('uploadMethodBtn').onclick = () => {
+      $('uploadMethodBtn').classList.add('active');
+      $('pasteMethodBtn').classList.remove('active');
+      $('uploadSection').classList.add('active');
+      $('pasteSection').classList.remove('active');
+    };
+    
+    $('pasteMethodBtn').onclick = () => {
+      $('pasteMethodBtn').classList.add('active');
+      $('uploadMethodBtn').classList.remove('active');
+      $('pasteSection').classList.add('active');
+      $('uploadSection').classList.remove('active');
+    };
+    
+    // File upload area click
+    $('fileUploadArea').onclick = () => $('fileInput').click();
+    
+    // Drag and drop
+    $('fileUploadArea').ondragover = (e) => {
+      e.preventDefault();
+      $('fileUploadArea').classList.add('drag-over');
+    };
+    
+    $('fileUploadArea').ondragleave = () => {
+      $('fileUploadArea').classList.remove('drag-over');
+    };
+    
+    $('fileUploadArea').ondrop = (e) => {
+      e.preventDefault();
+      $('fileUploadArea').classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileUpload(file);
+    };
+    
+    // File input change
+    $('fileInput').onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) handleFileUpload(file);
+    };
+    
+    // Handle file upload with chunked reading for large files
+    function handleFileUpload(file) {
+      const fileName = file.name;
+      const fileSize = file.size;
+      const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+      
+      $('fileName').textContent = `📎 ${fileName} (${fileSizeMB} MB)`;
+      $('fileName').classList.add('visible');
+      $('progressContainer').classList.add('visible');
+      $('progressBar').style.width = '0%';
+      $('progressText').textContent = 'Reading file...';
+      $('status').textContent = '';
+      
+      // For very large files (>5MB), read in chunks
+      if (fileSize > 5 * 1024 * 1024) {
+        readFileInChunks(file);
+      } else {
+        // Small files - read directly
+        const reader = new FileReader();
+        reader.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            $('progressBar').style.width = pct + '%';
+            $('progressText').textContent = `Reading: ${pct}%`;
+          }
+        };
+        reader.onload = (e) => {
+          uploadedFileContent = e.target.result;
+          $('progressBar').style.width = '100%';
+          $('progressText').textContent = `✓ File loaded (${countLines(uploadedFileContent).toLocaleString()} lines) - Click Analyze`;
+          $('status').textContent = 'File ready - click Analyze';
+          $('status').className = 'status success';
+        };
+        reader.onerror = () => {
+          $('progressText').textContent = '❌ Error reading file';
+          $('status').textContent = 'Error reading file';
+          $('status').className = 'status error';
+        };
+        reader.readAsText(file);
+      }
+    }
+    
+    // Read large files in chunks to prevent memory issues
+    function readFileInChunks(file) {
+      const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+      let offset = 0;
+      let content = '';
+      
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        content += e.target.result;
+        offset += CHUNK_SIZE;
+        
+        const pct = Math.min(100, Math.round((offset / file.size) * 100));
+        $('progressBar').style.width = pct + '%';
+        $('progressText').textContent = `Reading: ${pct}% (${(offset / (1024 * 1024)).toFixed(1)} MB)`;
+        
+        if (offset < file.size) {
+          readNextChunk();
+        } else {
+          uploadedFileContent = content;
+          $('progressBar').style.width = '100%';
+          $('progressText').textContent = `✓ File loaded (${countLines(content).toLocaleString()} lines) - Click Analyze`;
+          $('status').textContent = 'File ready - click Analyze';
+          $('status').className = 'status success';
+        }
+      };
+      
+      reader.onerror = () => {
+        $('progressText').textContent = '❌ Error reading file';
+        $('status').textContent = 'Error reading file';
         $('status').className = 'status error';
-        return;
+      };
+      
+      function readNextChunk() {
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        reader.readAsText(slice);
+      }
+      
+      readNextChunk();
+    }
+    
+    function countLines(text) {
+      let count = 0;
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === '\n') count++;
+      }
+      return count + 1;
+    }
+    
+    // Chunked analysis for large files
+    function analyzeInChunks(text, callback) {
+      const lines = text.split(/\r?\n/);
+      const totalLines = lines.length;
+      const CHUNK_SIZE = 10000; // Process 10k lines at a time
+      let processedLines = 0;
+      let filteredLines = [];
+      
+      $('progressContainer').classList.add('visible');
+      $('progressBar').style.width = '0%';
+      
+      function processChunk() {
+        const chunk = lines.slice(processedLines, processedLines + CHUNK_SIZE);
+        
+        if ($('autoFilter').checked) {
+          filteredLines = filteredLines.concat(filterLogs(chunk));
+        } else {
+          filteredLines = filteredLines.concat(chunk);
+        }
+        
+        processedLines += chunk.length;
+        const pct = Math.round((processedLines / totalLines) * 100);
+        $('progressBar').style.width = pct + '%';
+        $('progressText').textContent = `Processing: ${processedLines.toLocaleString()} / ${totalLines.toLocaleString()} lines (${pct}%)`;
+        
+        if (processedLines < totalLines) {
+          // Use setTimeout to allow UI to update
+          setTimeout(processChunk, 0);
+        } else {
+          // Done processing
+          $('progressText').textContent = 'Analyzing...';
+          
+          // Use setTimeout to let the UI update before heavy analysis
+          setTimeout(() => {
+            const originalCount = totalLines;
+            const filteredCount = filteredLines.length;
+            const removedCount = originalCount - filteredCount;
+            const pctRemoved = originalCount > 0 ? ((removedCount / originalCount) * 100).toFixed(1) : 0;
+            
+            if ($('autoFilter').checked) {
+              $('filterStats').style.display = 'block';
+              $('filterStatsText').innerHTML = `🔮 <strong>Filtered:</strong> ${originalCount.toLocaleString()} → ${filteredCount.toLocaleString()} lines (removed ${removedCount.toLocaleString()} noise lines, ${pctRemoved}%)`;
+            } else {
+              $('filterStats').style.display = 'none';
+            }
+            
+            fullParsedData = analyze(filteredLines.join('\n'));
+            parsedData = filterByDate(fullParsedData);
+            render(parsedData);
+            
+            $('progressContainer').classList.remove('visible');
+            $('status').textContent = `✓ Analyzed ${parsedData.total.toLocaleString()} lines`;
+            $('status').className = 'status success';
+            
+            if (callback) callback();
+          }, 10);
+        }
+      }
+      
+      processChunk();
+    }
+
+    $('analyzeBtn').onclick = () => {
+      // Check if we have uploaded file content or pasted text
+      const isUploadMode = $('uploadSection').classList.contains('active');
+      let text;
+      
+      if (isUploadMode) {
+        if (!uploadedFileContent) {
+          $('status').textContent = 'Please upload a file first';
+          $('status').className = 'status error';
+          return;
+        }
+        text = uploadedFileContent;
+      } else {
+        text = $('logInput').value;
+        if (!text.trim()) {
+          $('status').textContent = 'Please paste log content first';
+          $('status').className = 'status error';
+          return;
+        }
       }
 
+      const lineCount = countLines(text);
+      
+      // Use chunked processing for large files (>50k lines)
+      if (lineCount > 50000) {
+        $('status').textContent = 'Processing large file...';
+        $('status').className = 'status';
+        analyzeInChunks(text);
+        return;
+      }
+      
+      // Standard processing for smaller files
       let lines = text.split(/\r?\n/);
       const originalCount = lines.filter(l => l.trim()).length;
       
@@ -4247,6 +4531,13 @@ $('appsCount').textContent = actualAppsCount;
       $('dateTo').value = '';
       fullParsedData = null;
       hideInfoBox();
+      // Clear file upload state
+      uploadedFileContent = null;
+      $('fileInput').value = '';
+      $('fileName').textContent = '';
+      $('fileName').classList.remove('visible');
+      $('progressContainer').classList.remove('visible');
+      $('progressBar').style.width = '0%';
       $('status').textContent = '🔒 All data cleared';
       $('status').className = 'status success';
       setTimeout(() => { $('status').textContent = ''; }, 2000);
