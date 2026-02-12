@@ -3725,10 +3725,20 @@ const braveInLogs = allLines.some(line =>
           resumes: [],        // {ts, type: 'IGNORED'|'NEEDS_CONFIRM'|'TRACKING', duration, startTime}
           captureDesktop: [], // {ts} - "No monitors detected"
           helperDied: 0,
+          helperDiedEvents: [], // {ts} - individual helper died timestamps for trend
           stopErrors: [],     // {ts, msg}
           systemMem: null,    // parsed from Client MEM line
+          systemMemSnapshots: [], // all Client MEM readings for trend
           corporateUser: null,
-          enterpriseProfile: null
+          enterpriseProfile: null,
+          // Phase 3
+          resumeThreshold: null, // {keep, discard} from config
+          autoStartStops: [],    // {ts, type: 'START'|'STOP'|'NO_ACTIVITY', detail}
+          doubleStarts: [],      // {ts} - START without prior STOP
+          // Phase 4
+          sslErrors: [],         // {ts, msg}
+          http429s: [],          // {ts, msg}
+          pendingDetected: []    // {ts}
         }
       };
 
@@ -4168,6 +4178,7 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         // Helper died
         if (line.includes('Helper died')) {
           sa.helperDied++;
+          sa.helperDiedEvents.push({ ts });
         }
 
         // Stop errors
@@ -4180,13 +4191,14 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
           sa.authEvents.push({ ts, type: 'PROVISION_FAIL' });
         }
 
-        // System memory from helper logs
-        if (!sa.systemMem && line.includes('Client MEM:')) {
+        // System memory from helper logs (collect all snapshots + set first as primary)
+        if (line.includes('Client MEM:')) {
           const memMatch = line.match(/System Mem:\s*(\d+)\s*\/\s*(\d+)/);
           const pageMatch = line.match(/Pagefile:\s*(\d+)\s*\/\s*(\d+)/);
           const workMatch = line.match(/WorkingSet:\s*(\d+)\s*\/\s*(\d+)/);
           if (memMatch) {
-            sa.systemMem = {
+            const snapshot = {
+              ts,
               usedBytes: parseInt(memMatch[1]),
               totalBytes: parseInt(memMatch[2]),
               pagefileUsed: pageMatch ? parseInt(pageMatch[1]) : null,
@@ -4194,8 +4206,69 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
               workingSet: workMatch ? parseInt(workMatch[1]) : null,
               workingSetPeak: workMatch ? parseInt(workMatch[2]) : null
             };
+            sa.systemMemSnapshots.push(snapshot);
+            if (!sa.systemMem) sa.systemMem = snapshot;
           }
         }
+
+        // Phase 3: Resume threshold config
+        if (line.includes('resume_threshold')) {
+          // Look ahead - the next few lines have keep/discard values
+          // We parse this separately after the loop
+          sa._resumeThresholdFound = true;
+        }
+        if (sa._resumeThresholdFound && !sa.resumeThreshold) {
+          const keepMatch = line.match(/keep\s+([\d:]+)/);
+          const discardMatch = line.match(/discard\s+([\d:]+)/);
+          if (keepMatch) {
+            if (!sa._rtKeep) sa._rtKeep = keepMatch[1];
+          }
+          if (discardMatch) {
+            sa.resumeThreshold = { keep: sa._rtKeep || 'unknown', discard: discardMatch[1] };
+            delete sa._resumeThresholdFound;
+            delete sa._rtKeep;
+          }
+        }
+
+        // Phase 3: AUTO_START_STOP events
+        if (line.includes('AUTO_START_STOP') && line.includes('START_TRACKING')) {
+          sa.autoStartStops.push({ ts, type: 'START', detail: 'Auto-start triggered by activity detection' });
+        } else if (line.includes('AUTO_START_STOP') && line.includes('STOP_TRACKING')) {
+          sa.autoStartStops.push({ ts, type: 'STOP', detail: 'Auto-stop triggered by inactivity' });
+        } else if (line.includes('AUTO_START_NO_ACTIVTY')) {
+          sa.autoStartStops.push({ ts, type: 'NO_ACTIVITY', detail: 'Inactivity timeout while idle' });
+        }
+
+        // Phase 3: PENDING_DETECTED
+        if (line.includes('PENDING_DETECTED')) {
+          sa.pendingDetected.push({ ts });
+        }
+
+        // Phase 4: SSL errors
+        if (line.includes('SSL') && (line.includes('error') || line.includes('Error') || line.includes('timeout'))) {
+          sa.sslErrors.push({ ts, msg: line.substring(0, 200).trim() });
+        }
+
+        // Phase 4: HTTP 429 rate limiting
+        if (line.includes('Response: 429') || line.includes('Too Many Requests')) {
+          sa.http429s.push({ ts, msg: line.substring(0, 200).trim() });
+        }
+      }
+
+      // Phase 3: Detect double-starts (START_TRACKING without preceding STOP_TRACKING)
+      const trackingEvents = [];
+      for (const line of lines) {
+        const ts = parseTimestamp(line);
+        if (line.includes('START_TRACKING')) trackingEvents.push({ ts, type: 'START' });
+        else if (line.includes('STOP_TRACKING')) trackingEvents.push({ ts, type: 'STOP' });
+      }
+      trackingEvents.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      let lastTrackEvent = null;
+      for (const ev of trackingEvents) {
+        if (ev.type === 'START' && lastTrackEvent && lastTrackEvent.type === 'START') {
+          sa.doubleStarts.push({ ts: ev.ts });
+        }
+        lastTrackEvent = ev;
       }
 
       return data;
@@ -4341,6 +4414,34 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         } else {
           checks.push({ status: 'pass', label: 'Memory OK', detail: `${usedPct}% used (${usedGB.toFixed(1)}GB / ${totalGB.toFixed(1)}GB)`, icon: '💾', tooltip: 'System memory is within a healthy range. Memory pressure is unlikely to be causing any silent app issues. The OS should have no reason to kill the app for resource reclamation.' });
         }
+      }
+
+      // Phase 3: Double-starts
+      if (sa.doubleStarts.length > 0) {
+        score -= Math.min(10, sa.doubleStarts.length * 3);
+        checks.push({ status: sa.doubleStarts.length > 3 ? 'fail' : 'warn', label: `${sa.doubleStarts.length} Double-Start(s)`, detail: `Back-to-back START_TRACKING without a STOP in between — indicates crash-restart cycles`, icon: '⚡', tooltip: 'A "double-start" happens when a new START_TRACKING fires without the previous session being properly stopped. This usually means the app crashed mid-session and auto-restarted. The previous session\'s data may be incomplete. Occasional double-starts are OK (shows auto-recovery), but frequent ones indicate instability.' });
+      }
+
+      // Phase 3: Resume threshold config
+      if (sa.resumeThreshold) {
+        checks.push({ status: 'pass', label: 'Resume Config', detail: `Keep: ${sa.resumeThreshold.keep} / Discard: ${sa.resumeThreshold.discard}`, icon: '⚙️', tooltip: `The resume threshold controls how the app handles gaps after a restart. If the gap is shorter than the "keep" value (${sa.resumeThreshold.keep}), the time is automatically resumed. If it exceeds the "discard" value (${sa.resumeThreshold.discard}), the gap is discarded and tracking starts fresh. These values are set by the organization admin. Shorter thresholds mean gaps are discarded more aggressively.` });
+      }
+
+      // Phase 4: SSL errors
+      if (sa.sslErrors.length > 0) {
+        score -= Math.min(10, sa.sslErrors.length * 2);
+        checks.push({ status: sa.sslErrors.length > 5 ? 'fail' : 'warn', label: `${sa.sslErrors.length} SSL Error(s)`, detail: 'SSL/TLS connection errors detected — may affect data sync', icon: '🔒', tooltip: 'SSL errors mean the app couldn\'t establish a secure connection to Hubstaff servers. Causes include: corporate proxy/firewall intercepting HTTPS, outdated Windows root certificates, antivirus performing SSL inspection, or network instability. Data tracked locally should sync when the connection is restored, but persistent SSL issues can cause delayed or missing data on the dashboard.' });
+      }
+
+      // Phase 4: HTTP 429 rate limiting
+      if (sa.http429s.length > 0) {
+        score -= Math.min(15, sa.http429s.length > 20 ? 15 : 5);
+        checks.push({ status: sa.http429s.length > 20 ? 'fail' : 'warn', label: `${sa.http429s.length} Rate Limit(s)`, detail: 'HTTP 429 "Too Many Requests" — server throttling the app', icon: '🚦', tooltip: 'HTTP 429 means the Hubstaff server is rejecting requests because the app is sending too many too fast. This typically affects the /screens endpoint (screenshot uploads). When rate-limited, screenshots may be delayed or missing. This is usually temporary and resolves itself. If persistent, it could indicate a bug in the app version causing excessive API calls.' });
+      }
+
+      // Phase 4: PENDING_DETECTED
+      if (sa.pendingDetected.length > 0) {
+        checks.push({ status: 'warn', label: `${sa.pendingDetected.length} Pending Event(s)`, detail: 'Unsent data detected on startup — previous session had sync issues', icon: '📤', tooltip: 'PENDING_DETECTED means the app found data from a previous session that hadn\'t been uploaded to the server yet. The app will attempt to sync this data. If this happens frequently, it suggests the network connection is unreliable or the app is being shut down before it can finish uploading.' });
       }
 
       score = Math.max(0, Math.min(100, score));
@@ -4755,6 +4856,24 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
               <div class="sa-kpi-value">${memDisplay}</div>
               <div class="sa-kpi-detail">${memDetail || 'Not available in these logs'}</div>
             </div>
+            <div class="sa-kpi">
+              <div class="sa-tooltip"><strong>Auto-Start/Stop</strong>The silent app uses AUTO_START_STOP to begin tracking when it detects user activity and stop when the user goes idle. "Starts" show how many times auto-tracking kicked in. "No activity" events happen when the idle timeout fires (default 50 min with no input). This is the core mechanism that makes silent tracking work — without it, no time gets recorded.</div>
+              <div class="sa-kpi-label">Auto-Track</div>
+              <div class="sa-kpi-value">${sa.autoStartStops.filter(a => a.type === 'START').length}</div>
+              <div class="sa-kpi-detail">${sa.autoStartStops.filter(a => a.type === 'NO_ACTIVITY').length} idle timeouts</div>
+            </div>
+            ${sa.http429s.length > 0 ? `<div class="sa-kpi">
+              <div class="sa-tooltip"><strong>Rate Limiting</strong>HTTP 429 responses from the Hubstaff API. The server is throttling the app for sending too many requests. This primarily affects screenshot uploads (/screens endpoint). When rate-limited, screenshots may be delayed or missing entirely. Usually temporary, but persistent rate limiting can indicate a bug in the app version.</div>
+              <div class="sa-kpi-label">Rate Limits</div>
+              <div class="sa-kpi-value warn">${sa.http429s.length}</div>
+              <div class="sa-kpi-detail">HTTP 429 responses</div>
+            </div>` : ''}
+            ${sa.sslErrors.length > 0 ? `<div class="sa-kpi">
+              <div class="sa-tooltip"><strong>SSL/TLS Errors</strong>Secure connection failures to Hubstaff servers. Common causes include corporate proxies intercepting HTTPS traffic, expired certificates, antivirus SSL inspection, or network instability. Data may still be tracked locally but won't sync until the connection is restored.</div>
+              <div class="sa-kpi-label">SSL Errors</div>
+              <div class="sa-kpi-value danger">${sa.sslErrors.length}</div>
+              <div class="sa-kpi-detail">Connection failures</div>
+            </div>` : ''}
           </div>
 
           <div class="sa-checks">
@@ -4769,6 +4888,126 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
               </div>
             `).join('')}
           </div>
+
+          ${sa.resumes.length > 0 ? `
+            <div class="sa-lifecycle" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:14px;">
+              <div class="sa-lifecycle-header collapsed" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed');">
+                <h4>🔄 Resume Handling & Auto-Track (${sa.resumes.length} resume events, ${sa.autoStartStops.filter(a => a.type === 'START').length} auto-starts)</h4>
+                <span class="sa-lc-toggle">▼</span>
+              </div>
+              <div class="sa-lifecycle-body collapsed">
+                ${sa.resumeThreshold ? `<div style="padding:10px 14px; background:var(--panel); border-radius:8px; margin-bottom:10px; font-size:12px;">
+                  <strong style="color:var(--accent);">⚙️ Resume Threshold Config:</strong>
+                  <span style="margin-left:8px;">Keep: <strong style="color:var(--success);">${sa.resumeThreshold.keep}</strong></span>
+                  <span style="margin-left:12px;">Discard: <strong style="color:var(--danger);">${sa.resumeThreshold.discard}</strong></span>
+                  <span style="margin-left:12px; color:var(--muted);">— Gaps shorter than "keep" are auto-resumed. Gaps longer than "discard" are thrown away.</span>
+                </div>` : ''}
+                ${sa.doubleStarts.length > 0 ? `<div style="padding:8px 14px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:8px; margin-bottom:10px; font-size:12px; color:var(--warn);">
+                  ⚡ <strong>${sa.doubleStarts.length} Double-Start(s)</strong> — Back-to-back START_TRACKING without a STOP. Indicates crash→restart while tracking.
+                </div>` : ''}
+                <div class="table-wrap" style="max-height:300px;">
+                  <table>
+                    <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+                    <tbody>
+                      ${sa.resumes.map(r => {
+                        let badge, badgeCls, detail;
+                        if (r.type === 'DETECTED') {
+                          badge = 'RESUME DETECTED'; badgeCls = 'resume';
+                          detail = r.duration ? 'Gap: ' + r.duration : 'Duration unknown';
+                        } else if (r.type === 'IGNORED') {
+                          badge = 'RESUME IGNORED'; badgeCls = 'error';
+                          detail = 'Gap exceeded threshold — time discarded';
+                        } else if (r.type === 'NEEDS_CONFIRM') {
+                          badge = 'NEEDS CONFIRM'; badgeCls = 'resume';
+                          detail = 'Waiting for schedule/policy confirmation';
+                        } else if (r.type === 'TRACKING') {
+                          badge = 'RESUMED'; badgeCls = 'tracking';
+                          detail = 'Tracking resumed — gap time kept';
+                        } else {
+                          badge = r.type; badgeCls = 'auth'; detail = '';
+                        }
+                        return '<tr' + (r.type === 'IGNORED' ? ' class="sa-ev-highlight"' : '') + '>' +
+                          '<td style="font-family:monospace;font-size:10px;white-space:nowrap;color:var(--muted);width:140px;">' + fmtDate(r.ts) + '</td>' +
+                          '<td style="width:140px;"><span class="sa-ev-badge ' + badgeCls + '">' + badge + '</span></td>' +
+                          '<td>' + detail + '</td></tr>';
+                      }).join('')}
+                      ${sa.stopErrors.map(e => 
+                        '<tr class="sa-ev-highlight"><td style="font-family:monospace;font-size:10px;white-space:nowrap;color:var(--muted);width:140px;">' + fmtDate(e.ts) + '</td>' +
+                        '<td style="width:140px;"><span class="sa-ev-badge error">STOP ERROR</span></td>' +
+                        '<td>Tracking stopped due to error</td></tr>'
+                      ).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${(sa.http429s.length > 0 || sa.sslErrors.length > 0 || sa.systemMemSnapshots.length > 1 || sa.helperDiedEvents.length > 0) ? `
+            <div class="sa-lifecycle" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:14px;">
+              <div class="sa-lifecycle-header collapsed" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed');">
+                <h4>🖥️ System Resources & Network Health</h4>
+                <span class="sa-lc-toggle">▼</span>
+              </div>
+              <div class="sa-lifecycle-body collapsed">
+                ${sa.systemMemSnapshots.length > 1 ? (() => {
+                  const snaps = sa.systemMemSnapshots;
+                  const usages = snaps.map(s => (s.usedBytes / s.totalBytes * 100));
+                  const avgUsage = (usages.reduce((a,b) => a+b, 0) / usages.length).toFixed(0);
+                  const maxUsage = Math.max(...usages).toFixed(0);
+                  const minUsage = Math.min(...usages).toFixed(0);
+                  const totalGB = (snaps[0].totalBytes / (1024*1024*1024)).toFixed(0);
+                  return '<div style="padding:10px 14px; background:var(--panel); border-radius:8px; margin-bottom:10px; font-size:12px;">' +
+                    '<strong style="color:var(--accent);">💾 Memory Trend</strong> (' + snaps.length + ' snapshots, ' + totalGB + 'GB total RAM)<br>' +
+                    '<span style="margin-top:4px;display:inline-block;">Avg: <strong>' + avgUsage + '%</strong></span>' +
+                    '<span style="margin-left:16px;">Min: <strong style="color:var(--success);">' + minUsage + '%</strong></span>' +
+                    '<span style="margin-left:16px;">Max: <strong style="color:' + (parseInt(maxUsage) > 90 ? 'var(--danger)' : parseInt(maxUsage) > 75 ? 'var(--warn)' : 'var(--success)') + ';">' + maxUsage + '%</strong></span>' +
+                    '</div>';
+                })() : ''}
+                ${sa.helperDiedEvents.length > 0 ? (() => {
+                  // Group by date for trend
+                  const byDate = {};
+                  sa.helperDiedEvents.forEach(e => {
+                    if (!e.ts) return;
+                    const d = new Date(e.ts).toISOString().split('T')[0];
+                    byDate[d] = (byDate[d] || 0) + 1;
+                  });
+                  const dates = Object.keys(byDate).sort();
+                  if (dates.length > 1) {
+                    return '<div style="padding:10px 14px; background:var(--panel); border-radius:8px; margin-bottom:10px; font-size:12px;">' +
+                      '<strong style="color:var(--accent);">🔧 Helper Crash Trend</strong> (' + sa.helperDied + ' total)<br>' +
+                      '<div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">' +
+                      dates.map(d => {
+                        const count = byDate[d];
+                        const cls = count > 20 ? 'var(--danger)' : count > 10 ? 'var(--warn)' : 'var(--success)';
+                        return '<span style="background:rgba(26,16,40,0.5); border:1px solid var(--border); border-radius:4px; padding:2px 8px;">' + d.slice(5) + ': <strong style="color:' + cls + ';">' + count + '</strong></span>';
+                      }).join('') +
+                      '</div></div>';
+                  }
+                  return '';
+                })() : ''}
+                ${(sa.http429s.length > 0 || sa.sslErrors.length > 0) ? `
+                  <div class="table-wrap" style="max-height:250px;">
+                    <table>
+                      <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+                      <tbody>
+                        ${sa.http429s.map(e => 
+                          '<tr><td style="font-family:monospace;font-size:10px;white-space:nowrap;color:var(--muted);width:140px;">' + fmtDate(e.ts) + '</td>' +
+                          '<td style="width:140px;"><span class="sa-ev-badge error">HTTP 429</span></td>' +
+                          '<td style="font-size:10px;color:var(--muted);">Rate limited — too many requests</td></tr>'
+                        ).join('')}
+                        ${sa.sslErrors.map(e =>
+                          '<tr><td style="font-family:monospace;font-size:10px;white-space:nowrap;color:var(--muted);width:140px;">' + fmtDate(e.ts) + '</td>' +
+                          '<td style="width:140px;"><span class="sa-ev-badge error">SSL ERROR</span></td>' +
+                          '<td style="font-size:10px;color:var(--muted);">Secure connection failed</td></tr>'
+                        ).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
 
           ${health.multiDayGaps.length > 0 ? `
             <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
