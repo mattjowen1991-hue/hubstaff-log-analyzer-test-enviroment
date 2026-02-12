@@ -948,6 +948,146 @@
     .sa-kpi:last-child .sa-tooltip::after,
     .sa-check:nth-child(4) .sa-tooltip::after,
     .sa-check:nth-child(8) .sa-tooltip::after { left: auto; right: 30px; transform: none; }
+
+    /* Silent App Lifecycle Timeline */
+    .sa-lifecycle {
+      margin-top: 16px;
+      border-top: 1px dashed var(--border);
+      padding-top: 14px;
+    }
+    .sa-lifecycle-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 8px 4px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .sa-lifecycle-header:hover { background: #251535; }
+    .sa-lifecycle-header h4 {
+      font-size: 13px;
+      color: var(--link);
+      margin: 0;
+    }
+    .sa-lifecycle-header .sa-lc-toggle {
+      color: var(--muted);
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+    .sa-lifecycle-header.collapsed .sa-lc-toggle { transform: rotate(-90deg); }
+    .sa-lifecycle-body.collapsed { display: none; }
+
+    .sa-cycle {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .sa-cycle-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--panel);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .sa-cycle-header:hover { background: #251535; }
+    .sa-cycle-header .sa-cycle-date {
+      font-weight: 700;
+      color: var(--text);
+      min-width: 100px;
+    }
+    .sa-cycle-header .sa-cycle-uptime {
+      color: var(--success);
+      font-weight: 600;
+    }
+    .sa-cycle-header .sa-cycle-tracked {
+      color: var(--accent);
+    }
+    .sa-cycle-header .sa-cycle-tags { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+    .sa-cycle-tag {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .sa-cycle-tag.sleep { background: rgba(59,130,246,0.15); color: var(--info); }
+    .sa-cycle-tag.gap { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .sa-cycle-tag.crash { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .sa-cycle-tag.clean { background: rgba(34,197,94,0.1); color: var(--success); }
+    .sa-cycle-tag.resumed { background: rgba(168,85,247,0.15); color: var(--accent); }
+
+    .sa-cycle-events {
+      display: none;
+    }
+    .sa-cycle-events.open {
+      display: block;
+      padding: 0;
+    }
+    .sa-cycle-events table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .sa-cycle-events table th {
+      text-align: left;
+      padding: 6px 14px;
+      background: var(--card);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sa-cycle-events table td {
+      padding: 5px 14px;
+      border-bottom: 1px solid rgba(45,31,61,0.5);
+      vertical-align: top;
+    }
+    .sa-cycle-events table tr:last-child td { border-bottom: none; }
+    .sa-cycle-events table tr:hover { background: rgba(168,85,247,0.03); }
+    .sa-cycle-events table tr.sa-ev-highlight { background: rgba(239,68,68,0.05); }
+    .sa-cycle-events table tr.sa-ev-dim td { color: var(--muted); }
+    .sa-ev-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+    .sa-ev-badge.startup { background: rgba(34,197,94,0.15); color: var(--success); }
+    .sa-ev-badge.shutdown { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .sa-ev-badge.tracking { background: rgba(168,85,247,0.15); color: var(--accent); }
+    .sa-ev-badge.resume { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .sa-ev-badge.auth { background: rgba(59,130,246,0.1); color: var(--info); }
+    .sa-ev-badge.error { background: rgba(239,68,68,0.2); color: var(--danger); }
+    .sa-ev-badge.sleep { background: rgba(59,130,246,0.15); color: var(--info); }
+
+    .sa-gap-row {
+      background: rgba(239,68,68,0.05);
+      border: 1px dashed rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 8px 14px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: var(--danger);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sa-overnight-row {
+      padding: 4px 14px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
   </style>
 </head>
 <body>
@@ -4207,6 +4347,293 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       return { score, checks, multiDayGaps };
     }
 
+    // === SILENT APP LIFECYCLE TIMELINE ===
+    function buildLifecycleCycles(sa, data) {
+      // Build cycles: each cycle = one startup → shutdown period
+      // Sort all events chronologically
+      const events = [];
+
+      sa.startups.forEach(s => events.push({ ts: s.ts, type: 'startup', subtype: s.type }));
+      sa.shutdowns.forEach(s => events.push({ ts: s.ts, type: 'shutdown' }));
+      sa.resumes.forEach(r => events.push({ ts: r.ts, type: 'resume', subtype: r.type, duration: r.duration, startTime: r.startTime }));
+      sa.captureDesktop.forEach(c => events.push({ ts: c.ts, type: 'screen_sleep' }));
+      sa.authEvents.forEach(a => events.push({ ts: a.ts, type: 'auth', subtype: a.type }));
+      sa.stopErrors.forEach(e => events.push({ ts: e.ts, type: 'stop_error' }));
+
+      // Also pull tracking sessions for this timeline
+      data.sessions.forEach(s => {
+        events.push({ ts: s.start, type: 'track_start', reason: s.startReason });
+        if (s.stop) events.push({ ts: s.stop, type: 'track_stop', reason: s.stopReason, duration: s.duration });
+      });
+
+      events.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+      // Group into cycles (startup → shutdown)
+      const cycles = [];
+      let currentCycle = null;
+
+      for (const ev of events) {
+        if (ev.type === 'startup') {
+          if (currentCycle && !currentCycle.shutdownTs) {
+            // Previous cycle had no shutdown - it crashed
+            currentCycle.shutdownTs = ev.ts;
+            currentCycle.shutdownReason = 'CRASHED';
+            currentCycle.uptime = currentCycle.shutdownTs - currentCycle.startupTs;
+            cycles.push(currentCycle);
+          }
+          currentCycle = {
+            startupTs: ev.ts,
+            startupType: ev.subtype, // CLEAN or UNCLEAN
+            shutdownTs: null,
+            shutdownReason: null,
+            uptime: 0,
+            events: [],
+            trackingSessions: [],
+            totalTrackedSecs: 0,
+            hadScreenSleep: false,
+            hadResume: false,
+            resumeDuration: null,
+            resumeType: null,
+            authOk: false,
+            authFailed: false
+          };
+          currentCycle.events.push(ev);
+        } else if (currentCycle) {
+          currentCycle.events.push(ev);
+
+          if (ev.type === 'shutdown') {
+            currentCycle.shutdownTs = ev.ts;
+            currentCycle.shutdownReason = 'CLEAN';
+            currentCycle.uptime = ev.ts - currentCycle.startupTs;
+            cycles.push(currentCycle);
+            currentCycle = null;
+          } else if (ev.type === 'screen_sleep') {
+            currentCycle.hadScreenSleep = true;
+          } else if (ev.type === 'resume') {
+            currentCycle.hadResume = true;
+            currentCycle.resumeType = ev.subtype;
+            currentCycle.resumeDuration = ev.duration;
+          } else if (ev.type === 'auth') {
+            if (ev.subtype === 'TOKEN') currentCycle.authOk = true;
+            if (ev.subtype === 'PROVISION_FAIL') currentCycle.authFailed = true;
+          } else if (ev.type === 'track_start') {
+            currentCycle.trackingSessions.push({ start: ev.ts, reason: ev.reason });
+          } else if (ev.type === 'track_stop') {
+            const lastSession = currentCycle.trackingSessions[currentCycle.trackingSessions.length - 1];
+            if (lastSession && !lastSession.stop) {
+              lastSession.stop = ev.ts;
+              lastSession.stopReason = ev.reason;
+              lastSession.duration = ev.duration || 0;
+              currentCycle.totalTrackedSecs += lastSession.duration;
+            }
+          } else if (ev.type === 'stop_error') {
+            currentCycle.hadStopError = true;
+          }
+        }
+      }
+
+      // Handle last cycle if it never got a shutdown
+      if (currentCycle) {
+        currentCycle.shutdownReason = 'RUNNING';
+        currentCycle.uptime = (data.endTime || Date.now()) - currentCycle.startupTs;
+        cycles.push(currentCycle);
+      }
+
+      // Calculate gaps between cycles
+      for (let i = 0; i < cycles.length - 1; i++) {
+        const curr = cycles[i];
+        const next = cycles[i + 1];
+        if (curr.shutdownTs && next.startupTs) {
+          const gapMs = next.startupTs - curr.shutdownTs;
+          curr.gapAfterMs = gapMs;
+          curr.gapAfterHours = gapMs / 3600000;
+        }
+      }
+
+      return cycles;
+    }
+
+    function renderLifecycleTimeline(cycles) {
+      if (cycles.length === 0) return '';
+
+      const fmtTime12 = (ts) => {
+        if (!ts) return '--';
+        const d = new Date(ts);
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      };
+
+      const fmtDateShort = (ts) => {
+        if (!ts) return '--';
+        const d = new Date(ts);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      };
+
+      const fmtDurShort = (secs) => {
+        if (!secs || secs <= 0) return '0m';
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+      };
+
+      // Start collapsed
+      let html = `
+        <div class="sa-lifecycle">
+          <div class="sa-lifecycle-header collapsed" onclick="this.classList.toggle('collapsed'); this.nextElementSibling.classList.toggle('collapsed');">
+            <h4>📅 App Lifecycle Timeline (${cycles.length} cycles)</h4>
+            <span class="sa-lc-toggle">▼</span>
+          </div>
+          <div class="sa-lifecycle-body collapsed">
+      `;
+
+      for (let i = 0; i < cycles.length; i++) {
+        const c = cycles[i];
+        const cycleId = 'sa-cycle-' + i;
+        const dateStr = fmtDateShort(c.startupTs);
+        const uptimeStr = c.uptime ? fmtDurShort(c.uptime / 1000) : '--';
+        const trackedStr = fmtDurShort(c.totalTrackedSecs);
+
+        // Tags
+        let tags = '';
+        if (c.startupType === 'UNCLEAN') tags += '<span class="sa-cycle-tag crash">CRASHED START</span>';
+        if (c.hadScreenSleep) tags += '<span class="sa-cycle-tag sleep">SCREEN SLEEP</span>';
+        if (c.shutdownReason === 'CRASHED') tags += '<span class="sa-cycle-tag crash">NO SHUTDOWN</span>';
+        if (c.shutdownReason === 'RUNNING') tags += '<span class="sa-cycle-tag clean">STILL RUNNING</span>';
+        if (c.hadResume && c.resumeType === 'IGNORED') tags += '<span class="sa-cycle-tag gap">RESUME IGNORED</span>';
+        if (c.hadResume && c.resumeType === 'TRACKING') tags += '<span class="sa-cycle-tag resumed">RESUMED</span>';
+        if (c.authFailed) tags += '<span class="sa-cycle-tag crash">AUTH FAILED</span>';
+        if (c.hadStopError) tags += '<span class="sa-cycle-tag crash">STOP ERROR</span>';
+
+        // Build table rows for events
+        const keyEvents = c.events.filter(e =>
+          e.type === 'startup' || e.type === 'shutdown' || e.type === 'resume' ||
+          e.type === 'screen_sleep' || e.type === 'auth' || e.type === 'track_start' ||
+          e.type === 'track_stop' || e.type === 'stop_error'
+        );
+
+        let rowsHtml = '';
+        for (const ev of keyEvents) {
+          const time = fmtTime12(ev.ts);
+          let badge, badgeCls, detail, rowCls = '';
+
+          switch (ev.type) {
+            case 'startup':
+              badge = ev.subtype === 'CLEAN' ? 'STARTUP CLEAN' : 'STARTUP UNCLEAN';
+              badgeCls = ev.subtype === 'CLEAN' ? 'startup' : 'error';
+              detail = ev.subtype === 'CLEAN' ? 'App started normally after clean shutdown' : 'App started after crash or force-kill';
+              break;
+            case 'shutdown':
+              badge = 'SHUTDOWN';
+              badgeCls = 'shutdown';
+              detail = 'App shut down cleanly';
+              break;
+            case 'resume':
+              if (ev.subtype === 'DETECTED') {
+                badge = 'RESUME DETECTED';
+                badgeCls = 'resume';
+                detail = `Gap since last tracking: ${ev.duration || '?'}`;
+              } else if (ev.subtype === 'IGNORED') {
+                badge = 'RESUME IGNORED';
+                badgeCls = 'error';
+                detail = 'Gap exceeded threshold — time discarded, fresh start';
+                rowCls = 'sa-ev-highlight';
+              } else if (ev.subtype === 'NEEDS_CONFIRM') {
+                badge = 'RESUME PENDING';
+                badgeCls = 'resume';
+                detail = 'Resume needs schedule/policy confirmation';
+              } else if (ev.subtype === 'TRACKING') {
+                badge = 'RESUMED';
+                badgeCls = 'tracking';
+                detail = 'Tracking resumed — gap time kept';
+              } else {
+                badge = 'RESUME'; badgeCls = 'resume'; detail = ev.subtype;
+              }
+              break;
+            case 'screen_sleep':
+              badge = 'SCREEN SLEEP';
+              badgeCls = 'sleep';
+              detail = 'No monitors detected — PC went to sleep/hibernate';
+              rowCls = 'sa-ev-highlight';
+              break;
+            case 'auth':
+              if (ev.subtype === 'TOKEN') {
+                badge = 'AUTH OK'; badgeCls = 'auth'; detail = 'Authenticated via server token'; rowCls = 'sa-ev-dim';
+              } else if (ev.subtype === 'OFFLINE') {
+                badge = 'AUTH OFFLINE'; badgeCls = 'auth'; detail = 'Using cached credentials'; rowCls = 'sa-ev-dim';
+              } else if (ev.subtype === 'PROVISION_FAIL') {
+                badge = 'AUTH FAILED'; badgeCls = 'error'; detail = 'Corporate provisioning failed — app cannot track';
+                rowCls = 'sa-ev-highlight';
+              } else {
+                badge = 'AUTH'; badgeCls = 'auth'; detail = ev.subtype; rowCls = 'sa-ev-dim';
+              }
+              break;
+            case 'track_start':
+              badge = 'START TRACKING';
+              badgeCls = 'tracking';
+              detail = `Started by ${ev.reason || 'unknown'}`;
+              rowCls = 'sa-ev-dim';
+              break;
+            case 'track_stop':
+              badge = 'STOP TRACKING';
+              badgeCls = 'tracking';
+              detail = `Stopped by ${ev.reason || 'unknown'}`;
+              rowCls = ev.reason === 'CRASHED' || ev.reason === 'ERROR' ? 'sa-ev-highlight' : 'sa-ev-dim';
+              break;
+            case 'stop_error':
+              badge = 'STOP ERROR';
+              badgeCls = 'error';
+              detail = 'Tracking stopped due to internal error';
+              rowCls = 'sa-ev-highlight';
+              break;
+            default:
+              badge = ev.type; badgeCls = 'auth'; detail = ''; rowCls = 'sa-ev-dim';
+          }
+
+          rowsHtml += `<tr class="${rowCls}">
+            <td style="font-family:monospace; font-size:10px; white-space:nowrap; color:var(--muted); width:80px;">${time}</td>
+            <td style="width:140px;"><span class="sa-ev-badge ${badgeCls}">${badge}</span></td>
+            <td>${detail}</td>
+          </tr>`;
+        }
+
+        html += `
+          <div class="sa-cycle">
+            <div class="sa-cycle-header" onclick="var el=document.getElementById('${cycleId}'); el.classList.toggle('open');">
+              <span class="sa-cycle-date">${dateStr}</span>
+              <span class="sa-cycle-uptime">⏱ Up: ${uptimeStr}</span>
+              <span class="sa-cycle-tracked">🎯 Tracked: ${trackedStr}</span>
+              <span class="sa-cycle-tags">${tags}</span>
+            </div>
+            <div class="sa-cycle-events" id="${cycleId}">
+              <table>
+                <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        // Show gap between cycles
+        if (c.gapAfterMs && c.gapAfterHours > 1) {
+          const gapDays = (c.gapAfterHours / 24).toFixed(1);
+          const isMultiDay = c.gapAfterHours > 24;
+          if (isMultiDay) {
+            html += `<div class="sa-gap-row" style="font-weight:700;">
+              <span>🚨</span>
+              <span>GAP: ${gapDays} days (${c.gapAfterHours.toFixed(1)}h) — app was OFFLINE</span>
+            </div>`;
+          } else {
+            html += `<div class="sa-overnight-row">
+              <span>🌙</span>
+              <span>Overnight: ${c.gapAfterHours.toFixed(1)}h gap</span>
+            </div>`;
+          }
+        }
+      }
+
+      html += `</div></div>`;
+      return html;
+    }
+
     function renderSilentAppDashboard(sa, data) {
       const container = $('silentAppDashboard');
       if (!sa.detected) {
@@ -4362,6 +4789,11 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
               </div>
             </div>
           ` : ''}
+
+          ${(() => {
+            const cycles = buildLifecycleCycles(sa, data);
+            return renderLifecycleTimeline(cycles);
+          })()}
         </div>
       `;
 
