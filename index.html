@@ -918,10 +918,10 @@
       <!-- File Upload Section -->
       <div class="input-section active" id="uploadSection">
         <div class="file-upload-area" id="fileUploadArea">
-          <input type="file" id="fileInput" accept=".log,.txt,.1,.2,.3,.4,.5,.6,.7,.8,.9">
+          <input type="file" id="fileInput" accept=".log,.txt,.1,.2,.3,.4,.5,.6,.7,.8,.9" multiple>
           <div class="file-upload-icon">📄</div>
           <div class="file-upload-text"><strong>Click to upload</strong> or drag & drop</div>
-          <div class="file-upload-hint">Supports .log, .txt files (hubstaff.log, hubstaff.1, etc.)</div>
+          <div class="file-upload-hint">Supports multiple files — drop all your hubstaff.log, hubstaff.1, helper_hubstaff.log, audit.log files at once</div>
           <div class="file-name-display" id="fileName"></div>
         </div>
         <div class="progress-container" id="progressContainer">
@@ -4857,14 +4857,22 @@ $('appsCount').textContent = actualAppsCount;
     $('fileUploadArea').ondrop = (e) => {
       e.preventDefault();
       $('fileUploadArea').classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileUpload(file);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 1) {
+        handleMultiFileUpload(files);
+      } else if (files.length === 1) {
+        handleFileUpload(files[0]);
+      }
     };
     
     // File input change
     $('fileInput').onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) handleFileUpload(file);
+      const files = Array.from(e.target.files);
+      if (files.length > 1) {
+        handleMultiFileUpload(files);
+      } else if (files.length === 1) {
+        handleFileUpload(files[0]);
+      }
     };
     
     // Handle file upload with chunked reading for large files
@@ -4948,6 +4956,87 @@ $('appsCount').textContent = actualAppsCount;
       }
       
       readNextChunk();
+    }
+
+    // Handle multiple file uploads - reads all, sorts by date, combines
+    function handleMultiFileUpload(files) {
+      const fileArray = Array.from(files);
+      const totalFiles = fileArray.length;
+      const totalSize = fileArray.reduce((sum, f) => sum + f.size, 0);
+      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+      $('fileName').textContent = `📎 ${totalFiles} files selected (${totalSizeMB} MB total)`;
+      $('fileName').classList.add('visible');
+      $('progressContainer').classList.add('visible');
+      $('progressBar').style.width = '0%';
+      $('progressText').textContent = `Reading ${totalFiles} files...`;
+      $('status').textContent = '';
+
+      let filesRead = 0;
+      const fileContents = [];
+
+      fileArray.forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target.result;
+          // Extract first timestamp from file to determine date order
+          const firstTimestamp = extractFirstTimestamp(content);
+          fileContents.push({
+            name: file.name,
+            content: content,
+            firstTimestamp: firstTimestamp,
+            size: file.size
+          });
+
+          filesRead++;
+          const pct = Math.round((filesRead / totalFiles) * 100);
+          $('progressBar').style.width = pct + '%';
+          $('progressText').textContent = `Reading: ${filesRead}/${totalFiles} files (${pct}%)`;
+
+          // All files read - sort and combine
+          if (filesRead === totalFiles) {
+            // Sort by first timestamp (oldest first)
+            fileContents.sort((a, b) => {
+              if (!a.firstTimestamp && !b.firstTimestamp) return 0;
+              if (!a.firstTimestamp) return 1;
+              if (!b.firstTimestamp) return -1;
+              return a.firstTimestamp - b.firstTimestamp;
+            });
+
+            // Combine with separator comments showing file boundaries
+            const combined = fileContents.map(f => {
+              const dateStr = f.firstTimestamp ? new Date(f.firstTimestamp).toISOString().split('T')[0] : 'unknown date';
+              return `// === FILE: ${f.name} (starts ${dateStr}) ===\n${f.content}`;
+            }).join('\n');
+
+            uploadedFileContent = combined;
+            const lineCount = countLines(combined);
+
+            $('progressBar').style.width = '100%';
+            const fileList = fileContents.map(f => f.name).join(', ');
+            $('progressText').textContent = `✓ ${totalFiles} files loaded in date order (${lineCount.toLocaleString()} lines) - Click Analyze`;
+            $('fileName').innerHTML = `📎 ${totalFiles} files (${totalSizeMB} MB) — sorted: ${fileContents.map(f => '<strong>' + f.name + '</strong>').join(' → ')}`;
+            $('status').textContent = `${totalFiles} files merged in chronological order — click Analyze`;
+            $('status').className = 'status success';
+          }
+        };
+        reader.onerror = () => {
+          filesRead++;
+          $('progressText').textContent = `⚠️ Error reading ${file.name}, continuing...`;
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    // Extract first valid timestamp from log content
+    function extractFirstTimestamp(content) {
+      // Check first 20 lines for a timestamp
+      const lines = content.split('\n', 20);
+      for (const line of lines) {
+        const ts = parseTimestamp(line);
+        if (ts) return ts;
+      }
+      return null;
     }
     
     function countLines(text) {
