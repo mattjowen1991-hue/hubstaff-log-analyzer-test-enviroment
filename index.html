@@ -2354,7 +2354,7 @@
       
       // Extract location state
       const locationStateLine = allLines.find(line => line.includes('locationState is'));
-      let servicesEnabled = false, permissionsEnabled = false, accuracyEnabled = false, locationEnabled = false;
+      let servicesEnabled = null, permissionsEnabled = null, accuracyEnabled = null, locationEnabled = null;
       
       if (locationStateLine) {
         servicesEnabled = locationStateLine.includes('SERVICES_ENABLED');
@@ -5124,7 +5124,7 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       renderSilentAppDashboard(data.silentApp, data);
       
       // Generate and render root cause conclusion
-      if (plainMode) {
+      if (plainMode && !data.silentApp.detected) {
         const conclusion = generateRootCauseConclusion(deviceStatus, data);
         $('rootCauseCard').innerHTML = conclusion.html;
         $('rootCauseCard').style.display = 'block';
