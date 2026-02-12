@@ -773,6 +773,125 @@
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+    /* === SILENT APP HEALTH === */
+    .silent-app-dashboard {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .silent-app-dashboard .sa-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .silent-app-dashboard .sa-header h3 {
+      font-size: 15px;
+      color: var(--link);
+    }
+    .silent-app-dashboard .sa-header h3 span {
+      color: var(--accent);
+    }
+    .silent-app-dashboard .sa-version-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+    .sa-version-badge.current { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+    .sa-version-badge.outdated { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    .sa-version-badge.unknown { background: rgba(167,139,186,0.15); color: var(--muted); border: 1px solid rgba(167,139,186,0.3); }
+
+    .sa-health-bar-container {
+      margin-bottom: 18px;
+    }
+    .sa-health-bar-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .sa-health-bar-label .sa-score-text {
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .sa-health-bar-label .sa-score-desc {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .sa-health-bar-track {
+      width: 100%;
+      height: 12px;
+      background: #1a1025;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .sa-health-bar-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.8s ease, background 0.5s ease;
+    }
+
+    .sa-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .sa-kpi {
+      background: linear-gradient(135deg, var(--panel) 0%, #1a1028 100%);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .sa-kpi .sa-kpi-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .sa-kpi .sa-kpi-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--link);
+    }
+    .sa-kpi .sa-kpi-value.danger { color: var(--danger); }
+    .sa-kpi .sa-kpi-value.warn { color: var(--warn); }
+    .sa-kpi .sa-kpi-value.success { color: var(--success); }
+    .sa-kpi .sa-kpi-detail {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .sa-checks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 10px;
+    }
+    .sa-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .sa-check .sa-check-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .sa-check .sa-check-text { flex: 1; }
+    .sa-check .sa-check-text strong { display: block; margin-bottom: 2px; }
+    .sa-check .sa-check-text span { color: var(--muted); font-size: 11px; }
+    .sa-check.pass { border-color: rgba(34,197,94,0.3); }
+    .sa-check.fail { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); }
+    .sa-check.warn { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
   </style>
 </head>
 <body>
@@ -901,6 +1020,8 @@
     <div id="rootCauseCard" style="display:none;"></div>
     
     <div id="deviceDashboard" style="display:none;"></div>
+
+    <div id="silentAppDashboard" style="display:none;"></div>
 
     <div class="card" id="summaryCard" style="display:none; border-left: 3px solid var(--accent);">
       <div class="section-title"><span>📋</span> Quick Summary for Support</div>
@@ -3397,7 +3518,22 @@ const braveInLogs = allLines.some(line =>
         jobSites: [],
         userLocations: [],
         currentlyEnteredSites: [],
-        geofenceEvents: []
+        geofenceEvents: [],
+        // Silent App data
+        silentApp: {
+          detected: false,
+          version: null,
+          startups: [],       // {ts, type: 'CLEAN'|'UNCLEAN'}
+          shutdowns: [],      // {ts, reason}
+          authEvents: [],     // {ts, type: 'TOKEN'|'OFFLINE'|'PROVISION_FAIL', user}
+          resumes: [],        // {ts, type: 'IGNORED'|'NEEDS_CONFIRM'|'TRACKING', duration, startTime}
+          captureDesktop: [], // {ts} - "No monitors detected"
+          helperDied: 0,
+          stopErrors: [],     // {ts, msg}
+          systemMem: null,    // parsed from Client MEM line
+          corporateUser: null,
+          enterpriseProfile: null
+        }
       };
 
       const showDebug = $('showDebug').checked;
@@ -3744,7 +3880,412 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         }
       }
 
+      // === SILENT APP DETECTION ===
+      // Scan all lines for silent app / corporate indicators
+      const sa = data.silentApp;
+      for (const line of lines) {
+        const ts = parseTimestamp(line);
+
+        // Detect corporate/enterprise app (silent app indicator)
+        if (line.includes('ENTERPRISE_INSTALL') || line.includes('enterprise.profile') || line.includes('Corporate')) {
+          sa.detected = true;
+          if (!sa.enterpriseProfile && line.includes('ENTERPRISE_INSTALL')) {
+            const pathMatch = line.match(/installed:\s*(.+?)[\r\n]*$/);
+            sa.enterpriseProfile = pathMatch ? pathMatch[1].trim() : 'Detected';
+          }
+        }
+
+        if (line.includes('CORPORATE_LOGIN') || line.includes('CORPORATE_PROVISION')) {
+          sa.detected = true;
+          if (line.includes('CORPORATE_LOGIN')) {
+            const userMatch = line.match(/for user:\s*(.+?)[\r\n]*$/);
+            if (userMatch) sa.corporateUser = userMatch[1].trim();
+          }
+        }
+
+        if (line.includes('profile corporate') || (line.includes('profile') && line.includes('corporate'))) {
+          sa.detected = true;
+        }
+
+        // Only continue parsing silent app events if we've confirmed it's a silent app
+        if (!sa.detected) continue;
+
+        // Version extraction
+        if (!sa.version) {
+          if (line.includes('Client Version:') || line.includes('Core Version:')) {
+            const verMatch = line.match(/Version:\s*([\d.]+[^\s\r\n]*)/);
+            if (verMatch) sa.version = verMatch[1];
+          } else if (line.includes('Running Current Version:')) {
+            const verMatch = line.match(/Running Current Version:\s*([\d.]+[^\s\r\n]*)/);
+            if (verMatch) sa.version = verMatch[1];
+          } else if (line.includes('Version :')) {
+            const verMatch = line.match(/Version\s*:\s*([\d.]+[^\s\r\n]*)/);
+            if (verMatch) sa.version = verMatch[1];
+          }
+        }
+
+        // Startups
+        if (line.includes('STARTUP_CLEAN')) {
+          sa.startups.push({ ts, type: 'CLEAN' });
+        } else if (line.includes('STARTUP_UNCLEAN')) {
+          sa.startups.push({ ts, type: 'UNCLEAN' });
+        }
+
+        // Shutdowns
+        if (line.includes('(SHUTDOWN)')) {
+          sa.shutdowns.push({ ts, reason: 'CLEAN' });
+        }
+
+        // Auth events
+        if (line.includes('AUTH_TOKEN')) {
+          const userMatch = line.match(/via token:\s*(.+?)(?:\s*\|\|.*)?[\r\n]*$/);
+          sa.authEvents.push({ ts, type: 'TOKEN', user: userMatch ? userMatch[1].trim() : null });
+        } else if (line.includes('AUTH_OFFLINE')) {
+          sa.authEvents.push({ ts, type: 'OFFLINE' });
+        } else if (line.includes('CORPORATE_PROVISION_ATTEMPT_FAILED')) {
+          sa.authEvents.push({ ts, type: 'PROVISION_FAIL' });
+        }
+
+        // Resume events
+        if (line.includes('RESUME_DETECTED')) {
+          const durMatch = line.match(/Duration:\s*([\d:]+)/);
+          const startMatch = line.match(/Start time:\s*([^\r\n]+)/);
+          sa.resumes.push({
+            ts, type: 'DETECTED',
+            duration: durMatch ? durMatch[1].trim() : null,
+            startTime: startMatch ? startMatch[1].trim() : null
+          });
+        } else if (line.includes('RESUME_IGNORED')) {
+          const startMatch = line.match(/StartTime:\s*([^\r\n]+)/);
+          sa.resumes.push({ ts, type: 'IGNORED', startTime: startMatch ? startMatch[1].trim() : null });
+        } else if (line.includes('RESUME_NEEDS_CONFIRMATION')) {
+          sa.resumes.push({ ts, type: 'NEEDS_CONFIRM' });
+        } else if (line.includes('RESUME_TRACKING')) {
+          sa.resumes.push({ ts, type: 'TRACKING' });
+        }
+
+        // No monitors detected (screen sleep)
+        if (line.includes('CAPTURE_DESKTOP') && line.includes('No monitors detected')) {
+          sa.captureDesktop.push({ ts });
+        }
+
+        // Helper died
+        if (line.includes('Helper died')) {
+          sa.helperDied++;
+        }
+
+        // Stop errors
+        if (line.includes('STOP_ERROR')) {
+          sa.stopErrors.push({ ts, msg: line.substring(0, 200) });
+        }
+
+        // CORPORATE_PROVISION_ATTEMPT_FAILED
+        if (line.includes('CORPORATE_PROVISION_ATTEMPT_FAILED')) {
+          sa.authEvents.push({ ts, type: 'PROVISION_FAIL' });
+        }
+
+        // System memory from helper logs
+        if (!sa.systemMem && line.includes('Client MEM:')) {
+          const memMatch = line.match(/System Mem:\s*(\d+)\s*\/\s*(\d+)/);
+          const pageMatch = line.match(/Pagefile:\s*(\d+)\s*\/\s*(\d+)/);
+          const workMatch = line.match(/WorkingSet:\s*(\d+)\s*\/\s*(\d+)/);
+          if (memMatch) {
+            sa.systemMem = {
+              usedBytes: parseInt(memMatch[1]),
+              totalBytes: parseInt(memMatch[2]),
+              pagefileUsed: pageMatch ? parseInt(pageMatch[1]) : null,
+              pagefileTotal: pageMatch ? parseInt(pageMatch[2]) : null,
+              workingSet: workMatch ? parseInt(workMatch[1]) : null,
+              workingSetPeak: workMatch ? parseInt(workMatch[2]) : null
+            };
+          }
+        }
+      }
+
       return data;
+    }
+
+    // === SILENT APP HEALTH DASHBOARD ===
+    function calculateSilentAppHealth(sa, data) {
+      let score = 100;
+      const checks = [];
+      const LATEST_VERSION = '1.7.10';
+
+      // 1. Version check (-20 if outdated)
+      if (sa.version) {
+        const versionNum = sa.version.split('-')[0]; // strip hash
+        const isLatest = versionNum >= LATEST_VERSION;
+        if (!isLatest) {
+          score -= 20;
+          checks.push({ status: 'fail', label: 'Version Outdated', detail: `Running ${sa.version} — latest is ${LATEST_VERSION}. Update recommended.`, icon: '📦' });
+        } else {
+          checks.push({ status: 'pass', label: 'Version Current', detail: `Running ${sa.version}`, icon: '📦' });
+        }
+      } else {
+        score -= 5;
+        checks.push({ status: 'warn', label: 'Version Unknown', detail: 'Could not extract version from logs', icon: '📦' });
+      }
+
+      // 2. Auth check (-25 if provision failures)
+      const provisionFails = sa.authEvents.filter(a => a.type === 'PROVISION_FAIL').length;
+      const tokenAuths = sa.authEvents.filter(a => a.type === 'TOKEN').length;
+      const offlineAuths = sa.authEvents.filter(a => a.type === 'OFFLINE').length;
+      if (provisionFails > 0) {
+        score -= 25;
+        checks.push({ status: 'fail', label: 'Provisioning Failed', detail: `${provisionFails} CORPORATE_PROVISION_ATTEMPT_FAILED event(s). App may fail to track.`, icon: '🔐' });
+      } else if (tokenAuths > 0) {
+        checks.push({ status: 'pass', label: 'Authentication OK', detail: `${tokenAuths} successful token auth(s), ${offlineAuths} offline auth(s)`, icon: '🔐' });
+      } else if (offlineAuths > 0) {
+        score -= 5;
+        checks.push({ status: 'warn', label: 'Offline Auth Only', detail: `${offlineAuths} offline auth(s) but no token auth — check network`, icon: '🔐' });
+      }
+
+      // 3. Startup gaps (-15 per multi-day gap)
+      const sortedStartups = [...sa.startups].sort((a, b) => a.ts - b.ts);
+      const sortedShutdowns = [...sa.shutdowns].sort((a, b) => a.ts - b.ts);
+      let multiDayGaps = [];
+      for (let i = 0; i < sortedShutdowns.length; i++) {
+        const shutdownTs = sortedShutdowns[i].ts;
+        // Find next startup after this shutdown
+        const nextStartup = sortedStartups.find(s => s.ts > shutdownTs);
+        if (nextStartup) {
+          const gapMs = nextStartup.ts - shutdownTs;
+          const gapHours = gapMs / 3600000;
+          if (gapHours > 24) {
+            multiDayGaps.push({
+              shutdownTs,
+              startupTs: nextStartup.ts,
+              gapHours: Math.round(gapHours * 10) / 10,
+              gapDays: Math.round(gapHours / 24 * 10) / 10
+            });
+          }
+        }
+      }
+      if (multiDayGaps.length > 0) {
+        const maxGap = Math.max(...multiDayGaps.map(g => g.gapDays));
+        const penalty = Math.min(30, multiDayGaps.length * 15);
+        score -= penalty;
+        checks.push({ status: 'fail', label: `${multiDayGaps.length} Multi-Day Gap(s)`, detail: `App was offline for extended periods. Longest: ${maxGap} days. Total gaps: ${multiDayGaps.length}`, icon: '⏸️' });
+      } else {
+        checks.push({ status: 'pass', label: 'No Multi-Day Gaps', detail: 'App came back each day after shutdown', icon: '⏸️' });
+      }
+
+      // 4. Unclean startups (-5 per, max -15)
+      const uncleanCount = sa.startups.filter(s => s.type === 'UNCLEAN').length;
+      if (uncleanCount > 0) {
+        const penalty = Math.min(15, uncleanCount * 5);
+        score -= penalty;
+        checks.push({ status: uncleanCount > 3 ? 'fail' : 'warn', label: `${uncleanCount} Crash(es)`, detail: `${uncleanCount} STARTUP_UNCLEAN — app crashed or was force-killed`, icon: '💥' });
+      } else {
+        checks.push({ status: 'pass', label: 'No Crashes', detail: 'All startups were clean', icon: '💥' });
+      }
+
+      // 5. Helper died (-5 if >10, -10 if >50)
+      if (sa.helperDied > 50) {
+        score -= 10;
+        checks.push({ status: 'fail', label: `Helper Crashed ${sa.helperDied}×`, detail: 'Excessive helper process crashes — may affect app detection and screenshots', icon: '🔧' });
+      } else if (sa.helperDied > 10) {
+        score -= 5;
+        checks.push({ status: 'warn', label: `Helper Crashed ${sa.helperDied}×`, detail: 'Elevated helper crashes — monitor for screenshot/app detection issues', icon: '🔧' });
+      } else if (sa.helperDied > 0) {
+        checks.push({ status: 'pass', label: `Helper Crashed ${sa.helperDied}×`, detail: 'Low count — within normal range', icon: '🔧' });
+      } else {
+        checks.push({ status: 'pass', label: 'Helper Stable', detail: 'No helper process crashes detected', icon: '🔧' });
+      }
+
+      // 6. Screen sleep shutdowns
+      if (sa.captureDesktop.length > 0) {
+        // Not penalized but flagged - this is how silent app shuts down normally
+        checks.push({ status: sa.captureDesktop.length > 10 ? 'warn' : 'pass', label: `${sa.captureDesktop.length} Screen Sleep(s)`, detail: 'PC went to sleep/hibernate, triggering shutdown. This is expected for end-of-day.', icon: '🖥️' });
+      }
+
+      // 7. Stop errors
+      if (sa.stopErrors.length > 0) {
+        score -= 10;
+        checks.push({ status: 'fail', label: `${sa.stopErrors.length} Stop Error(s)`, detail: 'Tracking stopped due to errors — potential data loss', icon: '🛑' });
+      }
+
+      // 8. Resume handling
+      const resumeIgnored = sa.resumes.filter(r => r.type === 'IGNORED').length;
+      const longResumes = sa.resumes.filter(r => {
+        if (r.type !== 'DETECTED' || !r.duration) return false;
+        const parts = r.duration.split(':').map(Number);
+        const hours = parts[0] || 0;
+        return hours > 24;
+      });
+      if (longResumes.length > 0) {
+        score -= 10;
+        const maxDuration = longResumes.reduce((max, r) => {
+          return r.duration > max ? r.duration : max;
+        }, '0:00:00');
+        checks.push({ status: 'fail', label: `${longResumes.length} Long Resume Gap(s)`, detail: `App detected resume after extended downtime (longest: ${maxDuration}). Time was discarded.`, icon: '⏰' });
+      }
+
+      // 9. System memory
+      if (sa.systemMem) {
+        const usedGB = sa.systemMem.usedBytes / (1024 * 1024 * 1024);
+        const totalGB = sa.systemMem.totalBytes / (1024 * 1024 * 1024);
+        const usedPct = (sa.systemMem.usedBytes / sa.systemMem.totalBytes * 100).toFixed(0);
+        if (parseInt(usedPct) > 90) {
+          score -= 10;
+          checks.push({ status: 'fail', label: 'Memory Critical', detail: `${usedPct}% used (${usedGB.toFixed(1)}GB / ${totalGB.toFixed(1)}GB) — may cause crashes`, icon: '💾' });
+        } else if (parseInt(usedPct) > 75) {
+          score -= 5;
+          checks.push({ status: 'warn', label: 'Memory Elevated', detail: `${usedPct}% used (${usedGB.toFixed(1)}GB / ${totalGB.toFixed(1)}GB)`, icon: '💾' });
+        } else {
+          checks.push({ status: 'pass', label: 'Memory OK', detail: `${usedPct}% used (${usedGB.toFixed(1)}GB / ${totalGB.toFixed(1)}GB)`, icon: '💾' });
+        }
+      }
+
+      score = Math.max(0, Math.min(100, score));
+      return { score, checks, multiDayGaps };
+    }
+
+    function renderSilentAppDashboard(sa, data) {
+      const container = $('silentAppDashboard');
+      if (!sa.detected) {
+        container.style.display = 'none';
+        return;
+      }
+
+      const health = calculateSilentAppHealth(sa, data);
+      const score = health.score;
+
+      // Health bar color
+      let barColor, scoreLabel, scoreCls;
+      if (score >= 80) {
+        barColor = 'linear-gradient(90deg, #22c55e, #4ade80)';
+        scoreLabel = 'Healthy';
+        scoreCls = 'success';
+      } else if (score >= 60) {
+        barColor = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+        scoreLabel = 'Needs Attention';
+        scoreCls = 'warn';
+      } else if (score >= 40) {
+        barColor = 'linear-gradient(90deg, #f97316, #fb923c)';
+        scoreLabel = 'Degraded';
+        scoreCls = 'warn';
+      } else {
+        barColor = 'linear-gradient(90deg, #ef4444, #f87171)';
+        scoreLabel = 'Critical';
+        scoreCls = 'danger';
+      }
+
+      // Version badge
+      const LATEST_VERSION = '1.7.10';
+      let versionBadge = '';
+      if (sa.version) {
+        const versionNum = sa.version.split('-')[0];
+        const isLatest = versionNum >= LATEST_VERSION;
+        versionBadge = `<span class="sa-version-badge ${isLatest ? 'current' : 'outdated'}">${isLatest ? '✓' : '⚠'} v${sa.version}</span>`;
+      } else {
+        versionBadge = '<span class="sa-version-badge unknown">? Version Unknown</span>';
+      }
+
+      // KPI values
+      const totalStartups = sa.startups.length;
+      const cleanStartups = sa.startups.filter(s => s.type === 'CLEAN').length;
+      const uncleanStartups = sa.startups.filter(s => s.type === 'UNCLEAN').length;
+      const totalShutdowns = sa.shutdowns.length;
+      const provisionFails = sa.authEvents.filter(a => a.type === 'PROVISION_FAIL').length;
+      const totalGapDays = health.multiDayGaps.reduce((sum, g) => sum + g.gapDays, 0);
+
+      // System memory display
+      let memDisplay = '--';
+      let memDetail = '';
+      if (sa.systemMem) {
+        const totalGB = (sa.systemMem.totalBytes / (1024 * 1024 * 1024)).toFixed(0);
+        const usedPct = (sa.systemMem.usedBytes / sa.systemMem.totalBytes * 100).toFixed(0);
+        memDisplay = `${totalGB}GB`;
+        memDetail = `${usedPct}% in use`;
+      }
+
+      const html = `
+        <div class="silent-app-dashboard">
+          <div class="sa-header">
+            <h3><span>🏢</span> Silent App Health Dashboard</h3>
+            ${versionBadge}
+          </div>
+
+          <div class="sa-health-bar-container">
+            <div class="sa-health-bar-label">
+              <span class="sa-score-text" style="color:var(--${scoreCls})">${score}/100 — ${scoreLabel}</span>
+              <span class="sa-score-desc">${sa.corporateUser ? sa.corporateUser : 'Corporate User'}</span>
+            </div>
+            <div class="sa-health-bar-track">
+              <div class="sa-health-bar-fill" style="width:${score}%; background:${barColor};"></div>
+            </div>
+          </div>
+
+          <div class="sa-kpis">
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">Startups</div>
+              <div class="sa-kpi-value">${totalStartups}</div>
+              <div class="sa-kpi-detail">${cleanStartups} clean, ${uncleanStartups} crashed</div>
+            </div>
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">Shutdowns</div>
+              <div class="sa-kpi-value">${totalShutdowns}</div>
+              <div class="sa-kpi-detail">${sa.captureDesktop.length} from screen sleep</div>
+            </div>
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">Multi-Day Gaps</div>
+              <div class="sa-kpi-value ${health.multiDayGaps.length > 0 ? 'danger' : 'success'}">${health.multiDayGaps.length}</div>
+              <div class="sa-kpi-detail">${totalGapDays > 0 ? totalGapDays.toFixed(1) + ' days total offline' : 'No extended gaps'}</div>
+            </div>
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">Helper Crashes</div>
+              <div class="sa-kpi-value ${sa.helperDied > 50 ? 'danger' : sa.helperDied > 10 ? 'warn' : 'success'}">${sa.helperDied}</div>
+              <div class="sa-kpi-detail">${sa.helperDied > 50 ? 'Excessive — investigate' : sa.helperDied > 10 ? 'Elevated' : 'Normal range'}</div>
+            </div>
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">Auth Status</div>
+              <div class="sa-kpi-value ${provisionFails > 0 ? 'danger' : 'success'}" style="font-size:14px;">${provisionFails > 0 ? '❌ FAIL' : '✓ OK'}</div>
+              <div class="sa-kpi-detail">${provisionFails > 0 ? provisionFails + ' provision failure(s)' : 'Token auth working'}</div>
+            </div>
+            <div class="sa-kpi">
+              <div class="sa-kpi-label">System Memory</div>
+              <div class="sa-kpi-value">${memDisplay}</div>
+              <div class="sa-kpi-detail">${memDetail || 'Not available in these logs'}</div>
+            </div>
+          </div>
+
+          <div class="sa-checks">
+            ${health.checks.map(c => `
+              <div class="sa-check ${c.status}">
+                <span class="sa-check-icon">${c.icon}</span>
+                <div class="sa-check-text">
+                  <strong>${c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚠️'} ${c.label}</strong>
+                  <span>${c.detail}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          ${health.multiDayGaps.length > 0 ? `
+            <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
+              <div style="font-size:12px; font-weight:700; color:var(--danger); margin-bottom:8px;">🚨 Extended Offline Periods</div>
+              <div class="table-wrap" style="max-height:200px;">
+                <table>
+                  <thead><tr><th>Shutdown</th><th>Next Startup</th><th>Gap Duration</th></tr></thead>
+                  <tbody>
+                    ${health.multiDayGaps.map(g => `
+                      <tr>
+                        <td>${fmtDate(g.shutdownTs)}</td>
+                        <td>${fmtDate(g.startupTs)}</td>
+                        <td style="color:var(--danger); font-weight:600;">${g.gapDays} days (${g.gapHours}h)</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      container.innerHTML = html;
+      container.style.display = 'block';
     }
 
     function renderLevelTag(level) {
@@ -3826,6 +4367,9 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // Generate and render device dashboard
       const deviceStatus = generateDeviceDashboard(data);
       renderDeviceDashboard(deviceStatus);
+
+      // Generate and render silent app dashboard
+      renderSilentAppDashboard(data.silentApp, data);
       
       // Generate and render root cause conclusion
       if (plainMode) {
@@ -4540,6 +5084,8 @@ $('appsCount').textContent = actualAppsCount;
       $('timelineSection').style.display = 'none';
       $('filterStats').style.display = 'none';
       $('deviceDashboard').style.display = 'none';
+      $('silentAppDashboard').style.display = 'none';
+      $('silentAppDashboard').innerHTML = '';
       $('rootCauseCard').style.display = 'none';
       $('visitHistorySection').innerHTML = '';
       $('dateFrom').value = '';
