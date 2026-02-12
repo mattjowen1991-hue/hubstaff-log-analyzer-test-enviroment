@@ -4014,7 +4014,17 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // 1. Version check (-20 if outdated)
       if (sa.version) {
         const versionNum = sa.version.split('-')[0]; // strip hash
-        const isLatest = versionNum >= LATEST_VERSION;
+        const compareVersions = (a, b) => {
+          const pa = a.split('.').map(Number);
+          const pb = b.split('.').map(Number);
+          for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const na = pa[i] || 0, nb = pb[i] || 0;
+            if (na > nb) return 1;
+            if (na < nb) return -1;
+          }
+          return 0;
+        };
+        const isLatest = compareVersions(versionNum, LATEST_VERSION) >= 0;
         if (!isLatest) {
           score -= 20;
           checks.push({ status: 'fail', label: 'Version Outdated', detail: `Running ${sa.version} — latest is ${LATEST_VERSION}. Update recommended.`, icon: '📦' });
@@ -4176,7 +4186,15 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       let versionBadge = '';
       if (sa.version) {
         const versionNum = sa.version.split('-')[0];
-        const isLatest = versionNum >= LATEST_VERSION;
+        const compareVer = (a, b) => {
+          const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+          for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const na = pa[i] || 0, nb = pb[i] || 0;
+            if (na > nb) return 1; if (na < nb) return -1;
+          }
+          return 0;
+        };
+        const isLatest = compareVer(versionNum, LATEST_VERSION) >= 0;
         versionBadge = `<span class="sa-version-badge ${isLatest ? 'current' : 'outdated'}">${isLatest ? '✓' : '⚠'} v${sa.version}</span>`;
       } else {
         versionBadge = '<span class="sa-version-badge unknown">? Version Unknown</span>';
@@ -5179,6 +5197,8 @@ $('appsCount').textContent = actualAppsCount;
       $('visitHistorySection').innerHTML = '';
       $('dateFrom').value = '';
       $('dateTo').value = '';
+      $('tzOffset').value = '';
+      $('tzLabel').textContent = '';
       fullParsedData = null;
       hideInfoBox();
       // Clear file upload state
