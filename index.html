@@ -1328,10 +1328,12 @@
         <h3><span>📸</span> Screenshots & Screen Capture</h3>
         <div class="header-meta">
           <span class="badge" id="screenshotsCount">0</span>
+          <span class="badge" id="screenshotHealthBadge" style="display:none;background:#e74c3c;color:#fff;margin-left:4px;">⚠️ Issues</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="collapsible-content collapsed" id="screenshotsContent">
+        <div id="screenshotHealthPanel" style="display:none;margin-bottom:12px;"></div>
         <div class="table-wrap" style="max-height:250px;">
           <table>
             <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
@@ -1540,6 +1542,8 @@
       <nav class="help-nav">
         <button class="help-nav-btn active" data-section="overview">Overview</button>
         <button class="help-nav-btn" data-section="interface">Interface</button>
+        <button class="help-nav-btn" data-section="silentapp">Silent App</button>
+        <button class="help-nav-btn" data-section="screenshots">Screenshots</button>
         <button class="help-nav-btn" data-section="idle">Idle Time</button>
         <button class="help-nav-btn" data-section="sessions">Sessions</button>
         <button class="help-nav-btn" data-section="jobsites">Job Sites</button>
@@ -1552,19 +1556,34 @@
       <!-- OVERVIEW SECTION -->
       <div class="help-section active" id="help-overview">
         <h3>What This Tool Analyzes</h3>
-        <p>This analyzer is designed for <code>hubstaff.log</code> files (detailed client logs), not audit.log files. It works with logs from Windows, Mac, Linux, iOS, and Android.</p>
+        <p>This analyzer works with multiple Hubstaff log file types. You can <strong>upload multiple files at once</strong> — they'll be auto-sorted chronologically and merged.</p>
         
+        <h4>Supported Log Files</h4>
+        <table class="help-table">
+          <tr><th>File</th><th>Contains</th></tr>
+          <tr><td><code>hubstaff.log</code></td><td>Main client log — errors, warnings, screenshots, tracking, apps, URLs</td></tr>
+          <tr><td><code>hubstaff.1</code> – <code>.9</code></td><td>Rotated log files (older data)</td></tr>
+          <tr><td><code>helper_hubstaff.log</code></td><td>Helper process — memory usage, app detection, screenshot capture</td></tr>
+          <tr><td><code>audit.log</code></td><td>Audit events — startup, shutdown, tracking, auth (powers the Silent App Dashboard)</td></tr>
+        </table>
+
         <h4>Event Categories</h4>
         <table class="help-table">
           <tr><th>Category</th><th>What's Captured</th></tr>
           <tr><td><strong>Errors & Crashes</strong></td><td>[ERROR] events, watchdog hits, helper crashes, fatal errors</td></tr>
           <tr><td><strong>Warnings</strong></td><td>[WARN] events, discarded time, memory issues</td></tr>
-          <tr><td><strong>Screenshots</strong></td><td>Capture events, uploads, failures</td></tr>
-          <tr><td><strong>Network</strong></td><td>API responses (especially 4xx/5xx), connection issues</td></tr>
-          <tr><td><strong>Locations</strong></td><td>Geofence events, permission states, GPS coordinates</td></tr>
-          <tr><td><strong>Tracking</strong></td><td>Start/stop, idle, resume, discard events</td></tr>
-<tr><td><strong>Injected/Simulated Input</strong></td><td>"Simulating missed input" events indicating hardware recognition issues</td></tr>
-</table>
+          <tr><td><strong>Screenshots</strong></td><td>Capture events, uploads, failures, and <strong>blank screenshot risk analysis</strong> (permissions, security software, sleep)</td></tr>
+          <tr><td><strong>Network</strong></td><td>API responses (especially 4xx/5xx), SSL/TLS errors, rate limiting (429)</td></tr>
+          <tr><td><strong>Locations</strong></td><td>Geofence events, permission states, GPS coordinates, visit history</td></tr>
+          <tr><td><strong>Apps & URLs</strong></td><td>Tracked apps, websites, window titles, Brave Browser detection</td></tr>
+          <tr><td><strong>Injected/Simulated Input</strong></td><td>"Simulating missed input" events indicating hardware recognition issues</td></tr>
+          <tr><td><strong>Tracking</strong></td><td>Start/stop, idle, resume, discard, auto-start/stop events</td></tr>
+        </table>
+
+        <div class="help-callout">
+          <strong>💡 Silent App Detection</strong><br>
+          When corporate/enterprise silent app logs are detected (via <code>ENTERPRISE_INSTALL</code>, <code>CORPORATE_LOGIN</code>, or <code>profile corporate</code>), a dedicated <strong>Silent App Health Dashboard</strong> appears automatically with health scoring, lifecycle timeline, and KPI cards. See the <strong>Silent App</strong> tab for details.
+        </div>
 
         <h3>Built-in Noise Filter</h3>
         <p>Enabled by default, this removes routine log lines that don't help with debugging:</p>
@@ -1597,6 +1616,18 @@
 
       <!-- INTERFACE SECTION -->
       <div class="help-section" id="help-interface">
+        <h3>Input Methods</h3>
+        <p>Two ways to get log data into the analyzer:</p>
+        <table class="help-table">
+          <tr><th>Method</th><th>How</th></tr>
+          <tr><td><strong>📁 Upload File</strong></td><td>Click the upload area or drag & drop files. Supports <strong>multiple files at once</strong> — they'll be auto-sorted by timestamp and merged with file boundary markers.</td></tr>
+          <tr><td><strong>📋 Paste Text</strong></td><td>Switch to the Paste tab and paste log content directly.</td></tr>
+        </table>
+        <div class="help-callout">
+          <strong>💡 Multi-File Upload</strong><br>
+          For best results, upload all related files together: <code>hubstaff.log</code>, <code>hubstaff.1</code>–<code>.9</code>, <code>helper_hubstaff.log</code>, and <code>audit.log</code>. The analyzer sorts them oldest-first and shows the merge order in the UI.
+        </div>
+
         <h3>KPI Dashboard</h3>
         <table class="help-table">
           <tr><th>Metric</th><th>What It Means</th></tr>
@@ -1618,16 +1649,127 @@
           <tr><td><strong>Filter dates</strong></td><td>Narrow results to a specific date range</td></tr>
         </table>
 
+        <h3>Data Tables & Virtual Scrolling</h3>
+        <p>All data tables (screenshots, network, locations, apps, injected input, tracking, search results) use <strong>virtual scrolling</strong> for large datasets. This means you can scroll through thousands of events smoothly — all rows are accessible, not just the first 50.</p>
+
         <h3>Search Tips</h3>
-        <p>The search box searches <strong>all</strong> log lines, including filtered ones:</p>
+        <p>The search box searches <strong>all</strong> log lines, including filtered ones. All matches are shown with virtual scrolling.</p>
         <ul>
-          <li><code>error</code> - All error mentions</li>
-          <li><code>URL:</code> - Tracked websites</li>
-          <li><code>screenshot</code> - Screen capture events</li>
-          <li><code>Discard</code> - Rejected time</li>
-          <li><code>watchdog</code> - App freeze events</li>
-          <li><code>Response: 5</code> - Server errors (5xx)</li>
+          <li><code>error</code> — All error mentions</li>
+          <li><code>URL:</code> — Tracked websites</li>
+          <li><code>screenshot</code> — Screen capture events</li>
+          <li><code>Discard</code> — Rejected time</li>
+          <li><code>watchdog</code> — App freeze events</li>
+          <li><code>Response: 5</code> — Server errors (5xx)</li>
+          <li><code>Helper died</code> — Helper process crashes</li>
+          <li><code>CAPTURE_DESKTOP</code> — Screen sleep / monitor off events</li>
+          <li><code>CORPORATE_PROVISION</code> — Silent app provisioning events</li>
+          <li><code>Simulating missed</code> — Hardware input simulation events</li>
         </ul>
+      </div>
+
+      <!-- SILENT APP SECTION -->
+      <div class="help-section" id="help-silentapp">
+        <h3>Silent App Health Dashboard</h3>
+        <p>Automatically appears when corporate/enterprise silent app logs are detected. Provides a comprehensive diagnostic view tailored to silent app issues.</p>
+
+        <h4>Health Score (0–100)</h4>
+        <p>A weighted score based on detected issues. The bar turns from green to red as the score drops:</p>
+        <table class="help-table">
+          <tr><th>Check</th><th>Penalty</th></tr>
+          <tr><td>Version outdated (vs latest)</td><td>-20</td></tr>
+          <tr><td>Provision failures (<code>CORPORATE_PROVISION_ATTEMPT_FAILED</code>)</td><td>-25</td></tr>
+          <tr><td>Multi-day gaps (app offline &gt;24h)</td><td>-15 each</td></tr>
+          <tr><td>Unclean startups (crashes)</td><td>-5 each</td></tr>
+          <tr><td>Helper crashes (50+)</td><td>-5 to -10</td></tr>
+          <tr><td>Memory pressure (&gt;90%)</td><td>-5 to -10</td></tr>
+          <tr><td>Double-starts (crash-restart)</td><td>-10</td></tr>
+          <tr><td>SSL/TLS errors</td><td>up to -10</td></tr>
+          <tr><td>HTTP 429 rate limiting</td><td>up to -15</td></tr>
+          <tr><td>Screenshot blank risk factors</td><td>-5 to -15</td></tr>
+        </table>
+
+        <h4>KPI Cards</h4>
+        <table class="help-table">
+          <tr><th>Card</th><th>What It Shows</th></tr>
+          <tr><td><strong>Startups</strong></td><td>Total startups — clean vs. crashed (<code>STARTUP_UNCLEAN</code>)</td></tr>
+          <tr><td><strong>Shutdowns</strong></td><td>Clean shutdowns and how many from screen sleep</td></tr>
+          <tr><td><strong>Multi-Day Gaps</strong></td><td>Periods offline &gt;24 hours — the #1 silent app complaint</td></tr>
+          <tr><td><strong>Helper Crashes</strong></td><td>Helper process crash count (affects screenshots & app detection)</td></tr>
+          <tr><td><strong>Auth Status</strong></td><td>Token auth success or provision failure</td></tr>
+          <tr><td><strong>System Memory</strong></td><td>RAM usage from helper_hubstaff.log</td></tr>
+          <tr><td><strong>Auto-Track</strong></td><td>Auto-start count and idle timeout count</td></tr>
+          <tr><td><strong>Screenshots</strong></td><td>Screenshot health status and blank risk factors</td></tr>
+          <tr><td><strong>Rate Limits</strong></td><td>HTTP 429 responses (only appears when detected)</td></tr>
+          <tr><td><strong>SSL Errors</strong></td><td>Connection failures (only appears when detected)</td></tr>
+        </table>
+        <p>Every KPI card has a <strong>hover tooltip</strong> — hover over any card for a detailed explanation of what the metric means, why it matters, and what to do.</p>
+
+        <h4>Lifecycle Timeline</h4>
+        <p>Shows the app's startup→shutdown cycles as a collapsible timeline:</p>
+        <ul>
+          <li>Each cycle: date, uptime duration, tracked time, status tags</li>
+          <li>Expandable detail table with colour-coded event badges</li>
+          <li>Gap detection: overnight gaps (moon icon) and multi-day gaps (red alert boxes)</li>
+          <li>Tags: <code>SCREEN SLEEP</code>, <code>CRASHED START</code>, <code>NO SHUTDOWN</code>, <code>RESUME IGNORED</code>, <code>AUTH FAILED</code>, <code>STOP ERROR</code></li>
+        </ul>
+
+        <h4>Common Silent App Issues</h4>
+        <table class="help-table">
+          <tr><th>Issue</th><th>What to Check</th></tr>
+          <tr><td>Multi-day gaps</td><td>PC sleeping and app not restarting. Update to latest version. Check if app is set to auto-start on boot.</td></tr>
+          <tr><td><code>CORPORATE_PROVISION_ATTEMPT_FAILED</code></td><td>Auth failure — check network, enterprise profile, user account status</td></tr>
+          <tr><td>High unclean startups</td><td>App crashing repeatedly — check for antivirus interference or memory pressure</td></tr>
+          <tr><td>Screen sleep → shutdown chain</td><td>Normal end-of-day behaviour. Issue is if app doesn't restart the next day.</td></tr>
+          <tr><td>No <code>AUTO_START_STOP</code> events</td><td>Auto-track policy may not be configured for the user</td></tr>
+        </table>
+
+        <div class="help-callout">
+          <strong>💡 Tip:</strong> For the Silent App Dashboard to appear, make sure you include the <code>audit.log</code> file — the dashboard is powered by audit events (STARTUP, SHUTDOWN, START_TRACKING, etc.).
+        </div>
+      </div>
+
+      <!-- SCREENSHOTS SECTION -->
+      <div class="help-section" id="help-screenshots">
+        <h3>Screenshot Health Analysis</h3>
+        <p>The analyzer goes beyond counting screenshot events. It detects <strong>conditions that cause blank or black screenshots</strong> even when the upload process appears successful.</p>
+
+        <h4>Why This Matters</h4>
+        <p>When Hubstaff uploads a screenshot, the log shows "Uploading Screen" — but this only means data was sent. It does <strong>not</strong> confirm the image has actual content. Without proper permissions, the image may be just the desktop wallpaper or completely black.</p>
+
+        <h4>Risk Factors Detected</h4>
+        <table class="help-table">
+          <tr><th>Risk Factor</th><th>Severity</th><th>Meaning</th></tr>
+          <tr><td>Screen Recording Permission Issue</td><td>🔴 Critical</td><td>macOS permission denied — all screenshots blank</td></tr>
+          <tr><td>Helper Crashes Near Capture</td><td>🔴 Critical</td><td>Helper crashed within 60s of capture</td></tr>
+          <tr><td>Capture/Upload Failures</td><td>🔴 Critical</td><td>Explicit errors in logs</td></tr>
+          <tr><td>Screen Sleep During Tracking</td><td>🟡 Warning</td><td>Monitor off while tracker active</td></tr>
+          <tr><td>Security Software Detected</td><td>🟡 Warning</td><td>McAfee, Norton, Webroot, VirtualBox, etc.</td></tr>
+          <tr><td>Excessive Helper Crashes</td><td>🟡 Warning</td><td>50+ crashes — missed screenshots likely</td></tr>
+          <tr><td>Upload Rate Limited</td><td>🟡 Warning</td><td>HTTP 429 on /screens endpoint</td></tr>
+          <tr><td>macOS No Permission Confirmation</td><td>🔵 Info</td><td>macOS device with no evidence permission was granted</td></tr>
+        </table>
+
+        <h4>Where Results Appear</h4>
+        <ul>
+          <li><strong>Screenshots section</strong> — health panel at the top with stats and risk factor cards</li>
+          <li><strong>Root Cause Analysis</strong> — warns "Screenshots Uploading — But May Be Blank" instead of false success</li>
+          <li><strong>Silent App Dashboard</strong> — Screenshots KPI card and health check</li>
+        </ul>
+
+        <h4>Resolution Steps</h4>
+        <ol>
+          <li>Check the <strong>Activity page</strong> in Hubstaff dashboard — are screenshots actually blank?</li>
+          <li><strong>macOS:</strong> System Settings → Privacy & Security → Screen & System Audio Recording → toggle Hubstaff ON. May need quit & reopen.</li>
+          <li><strong>Windows:</strong> Check for antivirus/web-shield software (McAfee, Norton, Webroot) or VirtualBox.</li>
+          <li><strong>Sleep:</strong> Computer sleeping during tracking produces black screenshots.</li>
+          <li><strong>Silent App:</strong> Distribute the <code>.mobileconfig</code> file before installation to pre-approve permissions.</li>
+        </ol>
+
+        <div class="help-callout warning">
+          <strong>⚠️ Key Insight</strong><br>
+          "Uploading Screen" in the log does NOT mean the screenshot is valid. Always verify on the Activity page if blank screenshots are reported.
+        </div>
       </div>
 
       <!-- IDLE TIME SECTION -->
@@ -1790,10 +1932,22 @@
         <table class="help-table">
           <tr><th>Pattern</th><th>Meaning</th><th>Solution</th></tr>
           <tr><td><code>main_watchdog hit</code></td><td>App froze/became unresponsive</td><td>Check system resources, restart app</td></tr>
-          <tr><td><code>Helper died</code></td><td>Browser extension crashed</td><td>Reinstall extension, restart browser</td></tr>
+          <tr><td><code>Helper died</code></td><td>Helper process crashed (affects screenshots, app/URL detection)</td><td>Check for antivirus interference, update app version</td></tr>
           <tr><td><code>Response: 401</code></td><td>Authentication failed</td><td>User needs to re-login</td></tr>
           <tr><td><code>Could not resolve host</code></td><td>No internet connection</td><td>Check network connectivity</td></tr>
+          <tr><td><code>Response: 429</code></td><td>Rate limited — too many requests</td><td>Usually temporary; may affect screenshot uploads</td></tr>
         </table>
+
+        <h4>Blank / Black Screenshots</h4>
+        <p>If a user reports that screenshots appear blank, black, or show only the desktop wallpaper:</p>
+        <table class="help-table">
+          <tr><th>Platform</th><th>Common Cause</th><th>Fix</th></tr>
+          <tr><td><strong>macOS</strong></td><td>Screen Recording permission not granted</td><td>System Settings → Privacy & Security → Screen & System Audio Recording → Hubstaff ON. Quit & reopen.</td></tr>
+          <tr><td><strong>Windows</strong></td><td>Antivirus / web-shield software</td><td>Temporarily disable McAfee, Norton, Webroot to test. Whitelist Hubstaff if that fixes it.</td></tr>
+          <tr><td><strong>Any</strong></td><td>Computer sleeping while tracking</td><td>Screenshots at the moment of sleep will be black. This is expected behaviour.</td></tr>
+          <tr><td><strong>Any</strong></td><td>VirtualBox / VMware running</td><td>Virtual machine software can interfere with screen capture</td></tr>
+        </table>
+        <p>The analyzer's <strong>Screenshot Health Analysis</strong> (see the Screenshots tab) will detect these risk factors automatically.</p>
 
         <h4>Brave Browser</h4>
         <div class="help-callout warning">
@@ -1802,12 +1956,16 @@
         </div>
 
         <h4>Mac Permissions</h4>
-        <p>If URL or screenshot tracking isn't working on Mac:</p>
+        <p>If URL, screenshot, or app tracking isn't working on Mac:</p>
         <ul>
-          <li><strong>Screen Recording:</strong> System Settings → Privacy & Security → Screen Recording → Enable Hubstaff</li>
+          <li><strong>Screen & System Audio Recording:</strong> System Settings → Privacy & Security → Screen & System Audio Recording → Enable Hubstaff</li>
           <li><strong>Accessibility:</strong> System Settings → Privacy & Security → Accessibility → Enable Hubstaff</li>
           <li><strong>Automation:</strong> System Settings → Privacy & Security → Automation → Enable Hubstaff for browsers</li>
         </ul>
+        <div class="help-callout">
+          <strong>💡 Silent App on Mac</strong><br>
+          For corporate deployments, distribute the <code>.mobileconfig</code> file before installing the silent app to pre-approve Screen Recording and Accessibility permissions. Without it, an admin must grant permissions manually on each machine.
+        </div>
       </div>
 
       <!-- LOG PATTERNS SECTION -->
@@ -1818,13 +1976,20 @@
           <tr><td><code>[ERROR]</code></td><td>Something went wrong</td></tr>
           <tr><td><code>[WARN]</code></td><td>Potential issue</td></tr>
           <tr><td><code>main_watchdog hit</code></td><td>App froze</td></tr>
-          <tr><td><code>Helper died</code></td><td>Browser extension crashed</td></tr>
+          <tr><td><code>Helper died</code></td><td>Helper process crashed (affects screenshots, app/URL detection)</td></tr>
           <tr><td><code>Response: 4xx</code></td><td>Client error (auth, not found)</td></tr>
           <tr><td><code>Response: 5xx</code></td><td>Server error (outage)</td></tr>
+          <tr><td><code>Response: 429</code></td><td>Rate limited — too many requests</td></tr>
           <tr><td><code>Discard=1</code></td><td>Time was rejected</td></tr>
-          <tr><td><code>STARTUP_UNCLEAN</code></td><td>App crashed or was killed</td></tr>
+          <tr><td><code>STARTUP_CLEAN</code></td><td>App started normally</td></tr>
+          <tr><td><code>STARTUP_UNCLEAN</code></td><td>App crashed or was killed previously</td></tr>
           <tr><td><code>KeepIdle: 1</code></td><td>User chose to keep idle time</td></tr>
           <tr><td><code>KeepIdle: 0</code></td><td>User chose to discard idle time</td></tr>
+          <tr><td><code>Uploading Screen</code></td><td>Screenshot uploading (doesn't confirm it's valid)</td></tr>
+          <tr><td><code>CAPTURE_DESKTOP "No monitors detected"</code></td><td>Screen sleep / monitor off</td></tr>
+          <tr><td><code>CORPORATE_PROVISION_ATTEMPT_FAILED</code></td><td>Silent app auth failure</td></tr>
+          <tr><td><code>Simulating missed input</code></td><td>Hardware not recognised — input simulated</td></tr>
+          <tr><td><code>Could not resolve host</code></td><td>No internet connection (DNS failure)</td></tr>
         </table>
 
         <h3>Plain English Translations</h3>
@@ -1832,17 +1997,22 @@
         <table class="help-table">
           <tr><th>Technical Log</th><th>Plain English</th></tr>
           <tr><td><code>main_watchdog hit</code></td><td>⚠️ The app froze or became unresponsive</td></tr>
-          <tr><td><code>Helper died</code></td><td>🔌 The browser extension crashed</td></tr>
+          <tr><td><code>Helper died</code></td><td>🔌 The helper process crashed</td></tr>
           <tr><td><code>Response: 401</code></td><td>🔐 Authentication failed - user may be logged out</td></tr>
           <tr><td><code>kCLErrorDomain Code=1</code></td><td>📍 iOS Location Permission Denied</td></tr>
           <tr><td><code>TRACKING_NOT_STARTED</code></td><td>🚫 Timer Blocked - Not At Required Job Site</td></tr>
+          <tr><td><code>Uploading Screen</code></td><td>📸 Screenshot uploading — does not confirm image is valid</td></tr>
+          <tr><td><code>Wrote ScreenData</code></td><td>📸 Screenshot data written locally — upload pending</td></tr>
+          <tr><td><code>Simulating missed input</code></td><td>🔧 Hardware not recognised — input simulated</td></tr>
         </table>
 
         <h3>Workflow for Log Analysis</h3>
         <ol>
-          <li>Paste logs and click Analyze</li>
+          <li>Upload log files (drag & drop multiple for best results)</li>
           <li>Check <strong>Root Cause Analysis</strong> box first (if Plain English mode is on)</li>
-          <li>Review <strong>Quick Summary</strong> for prioritized findings</li>
+          <li>Check <strong>Silent App Dashboard</strong> if it appears (corporate/enterprise)</li>
+          <li>Review <strong>Quick Summary</strong> for prioritised findings</li>
+          <li>Check <strong>Screenshot Health</strong> if blank screenshots are reported</li>
           <li>Check <strong>Device Dashboard</strong> (Android) for permission/setting issues</li>
           <li>Review <strong>Tracking Sessions</strong> to understand what was tracked</li>
           <li>Check <strong>Idle Time Decisions</strong> if user disputes idle choices</li>
@@ -1857,6 +2027,92 @@
   <script>
     const $ = id => document.getElementById(id);
     const pad = n => String(n).padStart(2, '0');
+
+    // === VIRTUAL SCROLL TABLE ===
+    // Renders only visible rows for large datasets (1000+ rows)
+    // Falls back to regular rendering for small datasets
+    const VIRTUAL_THRESHOLD = 100; // Use virtual scroll above this count
+    const VIRTUAL_ROW_HEIGHT = 32; // px per row
+    const VIRTUAL_BUFFER = 10;     // extra rows above/below viewport
+
+    const virtualTableInstances = {}; // Track active instances for cleanup
+
+    function createVirtualTable(wrapId, tbodyId, items, rowRenderer, emptyMsg) {
+      const tbody = $(tbodyId);
+      const wrap = tbody.closest('.table-wrap');
+      
+      // Cleanup previous instance if exists
+      if (virtualTableInstances[wrapId]) {
+        const prev = virtualTableInstances[wrapId];
+        if (prev.scrollHandler) prev.wrap.removeEventListener('scroll', prev.scrollHandler);
+        delete virtualTableInstances[wrapId];
+      }
+
+      // Small dataset — render all directly (no virtual scroll needed)
+      if (!items || items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted)">${emptyMsg || 'No events found'}</td></tr>`;
+        return;
+      }
+      if (items.length <= VIRTUAL_THRESHOLD) {
+        tbody.innerHTML = items.map(rowRenderer).filter(r => r !== '').join('');
+        return;
+      }
+
+      // Virtual scroll mode
+      const table = tbody.closest('table');
+      const thead = table.querySelector('thead');
+      
+      // Get the wrap's max-height for viewport calc
+      const wrapHeight = parseInt(wrap.style.maxHeight) || 250;
+      const totalHeight = items.length * VIRTUAL_ROW_HEIGHT;
+      const visibleCount = Math.ceil(wrapHeight / VIRTUAL_ROW_HEIGHT);
+
+      // Create spacer for total scrollable height
+      // We put it as a single row with height = totalHeight
+      function renderVisibleRows() {
+        const scrollTop = wrap.scrollTop;
+        const theadHeight = thead ? thead.offsetHeight : 30;
+        const adjustedScroll = Math.max(0, scrollTop - theadHeight);
+        
+        const startIdx = Math.max(0, Math.floor(adjustedScroll / VIRTUAL_ROW_HEIGHT) - VIRTUAL_BUFFER);
+        const endIdx = Math.min(items.length, startIdx + visibleCount + VIRTUAL_BUFFER * 2);
+        
+        const topPad = startIdx * VIRTUAL_ROW_HEIGHT;
+        const bottomPad = (items.length - endIdx) * VIRTUAL_ROW_HEIGHT;
+        
+        let html = '';
+        if (topPad > 0) {
+          html += `<tr class="vs-spacer"><td colspan="4" style="height:${topPad}px;padding:0;border:none;"></td></tr>`;
+        }
+        for (let i = startIdx; i < endIdx; i++) {
+          const row = rowRenderer(items[i], i);
+          if (row !== '') html += row;
+        }
+        if (bottomPad > 0) {
+          html += `<tr class="vs-spacer"><td colspan="4" style="height:${bottomPad}px;padding:0;border:none;"></td></tr>`;
+        }
+        
+        tbody.innerHTML = html;
+      }
+
+      // Initial render
+      renderVisibleRows();
+
+      // Throttled scroll handler
+      let scrollRaf = null;
+      const scrollHandler = () => {
+        if (scrollRaf) return;
+        scrollRaf = requestAnimationFrame(() => {
+          renderVisibleRows();
+          scrollRaf = null;
+        });
+      };
+
+      wrap.addEventListener('scroll', scrollHandler, { passive: true });
+      
+      // Store instance for cleanup
+      virtualTableInstances[wrapId] = { wrap, scrollHandler };
+    }
 
     let allLines = [];
     let fullParsedData = null; // Store unfiltered data for date filtering
@@ -2244,11 +2500,13 @@
       
       // Screenshots
       if (m.includes('uploading screen'))
-        return { text: "📸 Screenshot was captured and is uploading", action: null, severity: "info" };
+        return { text: "📸 Screenshot data is uploading — does not confirm the image is valid (may be blank if permissions are missing)", action: null, severity: "info" };
       if (m.includes('capture screen'))
-        return { text: "📸 Taking a screenshot", action: null, severity: "info" };
+        return { text: "📸 Screenshot capture initiated — actual image quality depends on screen recording permissions", action: null, severity: "info" };
       if (m.includes('screenshot') && (m.includes('fail') || m.includes('error')))
-        return { text: "📸 Screenshot failed to capture or upload", action: "Check user's internet connection and screen capture permissions.", severity: "warning" };
+        return { text: "📸 Screenshot failed to capture or upload", action: "Check user's internet connection and screen capture permissions. On macOS: System Settings → Privacy & Security → Screen Recording.", severity: "warning" };
+      if (m.includes('wrote screendata'))
+        return { text: "📸 Screenshot data written locally — upload pending", action: null, severity: "info" };
       
       // Network errors
       if (m.includes('response: 401') || m.includes('response: 403'))
@@ -3558,16 +3816,41 @@ const braveInLogs = allLines.some(line =>
   });
 }
       
-      // Positive findings
-      if (data.screenshots.length > 0 && !data.screenshots.some(e => e.msg.toLowerCase().includes('fail') || e.msg.toLowerCase().includes('error'))) {
-        findings.push({
-          severity: 'success',
-          icon: '📸',
-          title: `${data.screenshots.length} Screenshots Captured`,
-          description: 'Screenshots were captured and uploaded successfully during this period.',
-          action: null,
-          techDetail: null
-        });
+      // Positive findings — screenshots
+      if (data.screenshots.length > 0) {
+        const sh = data.screenshotHealth;
+        const hasExplicitFail = data.screenshots.some(e => e.msg.toLowerCase().includes('fail') || e.msg.toLowerCase().includes('error'));
+        
+        if (hasExplicitFail) {
+          findings.push({
+            severity: 'critical',
+            icon: '📸',
+            title: 'Screenshot Capture/Upload Failures',
+            description: 'Explicit screenshot errors found in the logs. Some screenshots may be missing from the dashboard.',
+            action: 'Check screen capture permissions and internet connection. On macOS: System Settings → Privacy & Security → Screen Recording → toggle Hubstaff ON.',
+            techDetail: sh.failures.slice(0, 3).map(f => `${fmtTime(f.ts)}: ${f.msg}`).join('\n')
+          });
+        } else if (sh.blankRiskFactors.length > 0) {
+          const hasCritical = sh.blankRiskFactors.some(r => r.severity === 'critical');
+          const reasons = sh.blankRiskFactors.map(r => r.reason).join(', ');
+          findings.push({
+            severity: hasCritical ? 'critical' : 'warning',
+            icon: '📸',
+            title: `${data.screenshots.length} Screenshots Uploading — But May Be Blank`,
+            description: `The logs show screenshot events occurring, but ${sh.blankRiskFactors.length} risk factor(s) suggest the actual images may be blank or black: <strong>${reasons}</strong>. Check the Activity page in the Hubstaff dashboard to verify.`,
+            action: 'Verify screenshots on the dashboard Activity page. If blank: on macOS, check Screen Recording permission (System Settings → Privacy & Security). On Windows, check for McAfee, Norton, Webroot, or VirtualBox interference. See the Screenshots section below for full details.',
+            techDetail: sh.blankRiskFactors.map(r => `${r.severity.toUpperCase()}: ${r.reason} — ${r.detail}`).join('\n')
+          });
+        } else {
+          findings.push({
+            severity: 'success',
+            icon: '📸',
+            title: `${data.screenshots.length} Screenshots Captured`,
+            description: 'Screenshots were captured and uploaded successfully during this period. No blank screenshot risk factors detected.',
+            action: null,
+            techDetail: null
+          });
+        }
       }
       
       if (findings.length === 0) {
@@ -3739,6 +4022,18 @@ const braveInLogs = allLines.some(line =>
           sslErrors: [],         // {ts, msg}
           http429s: [],          // {ts, msg}
           pendingDetected: []    // {ts}
+        },
+        // Screenshot Health Analysis
+        screenshotHealth: {
+          captures: [],          // {ts} - "Capture Screen" events
+          uploads: [],           // {ts, msg} - "Uploading Screen" events
+          writeEvents: [],       // {ts, msg} - "Wrote ScreenData" events
+          failures: [],          // {ts, msg} - explicit screenshot failures
+          sleepDuringTracking: [], // {ts} - screen sleep while tracker active
+          helperCrashNearCapture: 0, // helper crashes within 60s of a capture
+          blankRiskFactors: [],  // {reason, detail, severity} - reasons screenshots may be blank
+          securitySoftware: [],  // {ts, name} - detected security/antivirus software
+          permissionIssues: []   // {ts, msg} - screen recording permission issues
         }
       };
 
@@ -3893,6 +4188,33 @@ if (!showTrace && level === 'TRACE') continue;
         // Screenshots
         if (line.includes('Uploading Screen') || line.includes('Capture Screen') || line.includes('ScreenData') || line.includes('screenshot') || line.includes('Screenshot')) {
           data.screenshots.push(entry);
+          // Detailed screenshot health tracking
+          const lowerLine = line.toLowerCase();
+          if (lowerLine.includes('capture screen')) {
+            data.screenshotHealth.captures.push({ ts, msg });
+          }
+          if (lowerLine.includes('uploading screen')) {
+            data.screenshotHealth.uploads.push({ ts, msg });
+          }
+          if (lowerLine.includes('wrote screendata') || lowerLine.includes('screendata')) {
+            data.screenshotHealth.writeEvents.push({ ts, msg });
+          }
+          if ((lowerLine.includes('screenshot') || lowerLine.includes('screen')) && (lowerLine.includes('fail') || lowerLine.includes('error') || lowerLine.includes('denied') || lowerLine.includes('permission'))) {
+            data.screenshotHealth.failures.push({ ts, msg });
+          }
+        }
+
+        // Detect security/antivirus software that can cause blank screenshots
+        if (line.match(/mcafee|norton|webroot|avast|avg |bitdefender|kaspersky|sophos|malwarebytes|eset |trend micro|crowdstrike|sentinel|virtualbox|vmware|webshield|web.shield|firewall/i)) {
+          const swMatch = line.match(/(McAfee|Norton|Webroot|Avast|AVG|Bitdefender|Kaspersky|Sophos|Malwarebytes|ESET|Trend Micro|CrowdStrike|SentinelOne|VirtualBox|VMware|WebShield|Firewall)/i);
+          if (swMatch) {
+            data.screenshotHealth.securitySoftware.push({ ts, name: swMatch[1] });
+          }
+        }
+
+        // Detect screen recording permission issues (macOS)
+        if (line.match(/screen.?recording.?permission|screen.?capture.?permission|kTCCService|tcc.*screen|CGWindowList.*error|screen.?recording.*denied|cannot.?capture|capture.*denied|accessibility.*denied/i)) {
+          data.screenshotHealth.permissionIssues.push({ ts, msg });
         }
 
         // Network
@@ -4271,6 +4593,144 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         lastTrackEvent = ev;
       }
 
+      // === SCREENSHOT HEALTH ANALYSIS ===
+      const sh = data.screenshotHealth;
+      const _sa = data.silentApp;
+      
+      // Check 1: Screen sleep during active tracking periods
+      // Build tracking windows from audit events
+      const trackWindows = [];
+      let trackStart = null;
+      for (const line of lines) {
+        const ts = parseTimestamp(line);
+        if (line.includes('START_TRACKING')) trackStart = ts;
+        else if (line.includes('STOP_TRACKING') && trackStart) {
+          trackWindows.push({ start: trackStart, end: ts });
+          trackStart = null;
+        }
+      }
+      // Check if any screen sleep happened during tracking
+      if (_sa.detected) {
+        _sa.captureDesktop.forEach(cd => {
+          for (const w of trackWindows) {
+            if (cd.ts >= w.start && cd.ts <= w.end) {
+              sh.sleepDuringTracking.push({ ts: cd.ts });
+              break;
+            }
+          }
+        });
+      }
+      
+      // Check 2: Helper crashes near capture events
+      if (_sa.detected && _sa.helperDiedEvents.length > 0 && sh.captures.length > 0) {
+        const NEAR_THRESHOLD = 60000; // 60 seconds
+        _sa.helperDiedEvents.forEach(hd => {
+          sh.captures.forEach(cap => {
+            if (cap.ts && hd.ts && Math.abs(cap.ts - hd.ts) < NEAR_THRESHOLD) {
+              sh.helperCrashNearCapture++;
+            }
+          });
+        });
+      }
+      
+      // Check 3: Deduplicate security software detections
+      const seenSw = new Set();
+      sh.securitySoftware = sh.securitySoftware.filter(s => {
+        const key = s.name.toLowerCase();
+        if (seenSw.has(key)) return false;
+        seenSw.add(key);
+        return true;
+      });
+      
+      // Build risk factors
+      // Factor: Uploads without captures (app says it uploaded but may not have actually captured properly)
+      if (sh.uploads.length > 0 && sh.captures.length === 0) {
+        sh.blankRiskFactors.push({
+          reason: 'Uploads Without Captures',
+          detail: `Found ${sh.uploads.length} upload events but no capture events. The app may be uploading placeholder/blank images.`,
+          severity: 'warning'
+        });
+      }
+      
+      // Factor: Screen sleep during tracking
+      if (sh.sleepDuringTracking.length > 0) {
+        sh.blankRiskFactors.push({
+          reason: 'Screen Sleep During Tracking',
+          detail: `The monitor went to sleep ${sh.sleepDuringTracking.length} time(s) while tracking was active. Screenshots captured during or after screen sleep will be blank/black.`,
+          severity: 'warning'
+        });
+      }
+      
+      // Factor: Security software detected
+      if (sh.securitySoftware.length > 0) {
+        const names = sh.securitySoftware.map(s => s.name).join(', ');
+        sh.blankRiskFactors.push({
+          reason: 'Security Software Detected',
+          detail: `Found ${names} in logs. Antivirus, web-shield, and internet security software are known to interfere with Hubstaff's screenshot function, causing blank or black images.`,
+          severity: 'warning'
+        });
+      }
+      
+      // Factor: Screen recording permission issues
+      if (sh.permissionIssues.length > 0) {
+        sh.blankRiskFactors.push({
+          reason: 'Screen Recording Permission Issue',
+          detail: `Found ${sh.permissionIssues.length} permission-related event(s). On macOS, if screen recording permission is not granted, all screenshots will appear as blank desktop backgrounds without any window content.`,
+          severity: 'critical'
+        });
+      }
+      
+      // Factor: Excessive helper crashes (helper captures screenshots)
+      if (_sa.detected && _sa.helperDied >= 50) {
+        sh.blankRiskFactors.push({
+          reason: 'Excessive Helper Crashes',
+          detail: `The helper process (which captures screenshots) crashed ${_sa.helperDied} times. This can cause missed or corrupted screenshots.`,
+          severity: 'warning'
+        });
+      }
+      
+      // Factor: Helper crashes near capture times
+      if (sh.helperCrashNearCapture > 0) {
+        sh.blankRiskFactors.push({
+          reason: 'Helper Crashes Near Capture',
+          detail: `The helper process crashed ${sh.helperCrashNearCapture} time(s) within 60 seconds of a screenshot capture. These screenshots are likely blank or missing.`,
+          severity: 'critical'
+        });
+      }
+      
+      // Factor: Rate limiting on /screens endpoint
+      if (_sa.detected && _sa.http429s.length > 0) {
+        const screensRateLimit = _sa.http429s.filter(h => h.msg && h.msg.includes('/screens'));
+        if (screensRateLimit.length > 0) {
+          sh.blankRiskFactors.push({
+            reason: 'Screenshot Upload Rate Limited',
+            detail: `${screensRateLimit.length} HTTP 429 rate limit responses on the /screens endpoint. Rate-limited screenshots may fail to upload or appear as missing in the dashboard.`,
+            severity: 'warning'
+          });
+        }
+      }
+      
+      // Factor: Explicit failures
+      if (sh.failures.length > 0) {
+        sh.blankRiskFactors.push({
+          reason: 'Screenshot Capture/Upload Failures',
+          detail: `${sh.failures.length} explicit screenshot failure(s) detected in the logs.`,
+          severity: 'critical'
+        });
+      }
+      
+      // Factor: Screenshots present but with known blank-causing patterns
+      // If we see uploads happening but the OS is macOS and no permission confirmation found
+      const isMac = lines.some(l => /macOS|darwin|CFBundle|NSApplication|kCLError|\.app\/Contents/i.test(l));
+      const hasPermConfirm = lines.some(l => /screen.?recording.*(granted|allowed|enabled|true)/i.test(l));
+      if (isMac && sh.uploads.length > 0 && !hasPermConfirm && sh.permissionIssues.length === 0) {
+        sh.blankRiskFactors.push({
+          reason: 'macOS — No Screen Recording Permission Confirmation',
+          detail: 'This appears to be a macOS device with screenshot uploads, but no log confirmation that screen recording permission was granted. On macOS 10.15+, without this permission, Hubstaff captures screenshots that show only the desktop wallpaper — no windows or content. The user (or their IT admin) needs to grant Screen Recording permission in System Settings → Privacy & Security.',
+          severity: 'info'
+        });
+      }
+
       return data;
     }
 
@@ -4442,6 +4902,19 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // Phase 4: PENDING_DETECTED
       if (sa.pendingDetected.length > 0) {
         checks.push({ status: 'warn', label: `${sa.pendingDetected.length} Pending Event(s)`, detail: 'Unsent data detected on startup — previous session had sync issues', icon: '📤', tooltip: 'PENDING_DETECTED means the app found data from a previous session that hadn\'t been uploaded to the server yet. The app will attempt to sync this data. If this happens frequently, it suggests the network connection is unreliable or the app is being shut down before it can finish uploading.' });
+      }
+
+      // Screenshot Health Check
+      if (data && data.screenshotHealth) {
+        const sh = data.screenshotHealth;
+        if (sh.blankRiskFactors.length > 0) {
+          const hasCritical = sh.blankRiskFactors.some(r => r.severity === 'critical');
+          const reasons = sh.blankRiskFactors.map(r => r.reason).join(', ');
+          score -= hasCritical ? 15 : 5;
+          checks.push({ status: hasCritical ? 'fail' : 'warn', label: `Screenshot Blank Risk`, detail: `${sh.blankRiskFactors.length} factor(s): ${reasons}`, icon: '📸', tooltip: 'Screenshots appear to be uploading, but conditions exist that commonly cause blank or black screenshots. Check the Activity page in Hubstaff dashboard to verify screenshots aren\'t blank. Common causes: missing screen recording permission on macOS, antivirus/web-shield software (McAfee, Norton, Webroot), VirtualBox, or the computer going to sleep during tracking. See the "Screenshots & Screen Capture" section for full details and resolution steps.' });
+        } else if (data.screenshots.length > 0) {
+          checks.push({ status: 'pass', label: 'Screenshots Healthy', detail: `${data.screenshots.length} screenshot events, no blank risk factors`, icon: '📸', tooltip: 'Screenshot capture and upload events look healthy. No conditions detected that would typically cause blank or black screenshots. If the user still reports blank screenshots, check: (1) macOS screen recording permission, (2) antivirus software, (3) whether the computer sleeps during tracking.' });
+        }
       }
 
       score = Math.max(0, Math.min(100, score));
@@ -4874,6 +5347,12 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
               <div class="sa-kpi-value danger">${sa.sslErrors.length}</div>
               <div class="sa-kpi-detail">Connection failures</div>
             </div>` : ''}
+            ${data.screenshots.length > 0 ? `<div class="sa-kpi">
+              <div class="sa-tooltip"><strong>Screenshot Health</strong>Tracks whether screenshots are likely to be valid or blank/black. The log shows "Uploading Screen" events, but this only means the app attempted to capture — it does NOT confirm the image contains actual content. Without screen recording permission on macOS, all screenshots will be blank wallpaper. Security software (McAfee, Norton, Webroot) and VirtualBox can also cause blank screenshots on Windows. Check the Activity page in the Hubstaff dashboard to verify screenshots are not blank. See the "Screenshots & Screen Capture" section for detailed risk analysis.</div>
+              <div class="sa-kpi-label">Screenshots</div>
+              <div class="sa-kpi-value ${data.screenshotHealth.blankRiskFactors.length > 0 ? (data.screenshotHealth.blankRiskFactors.some(r => r.severity === 'critical') ? 'danger' : 'warn') : 'success'}">${data.screenshotHealth.blankRiskFactors.length > 0 ? '⚠️ Check' : '✓ OK'}</div>
+              <div class="sa-kpi-detail">${data.screenshots.length} events${data.screenshotHealth.blankRiskFactors.length > 0 ? ', ' + data.screenshotHealth.blankRiskFactors.length + ' risk factor(s)' : ', no blank risks'}</div>
+            </div>` : ''}
           </div>
 
           <div class="sa-checks">
@@ -5040,6 +5519,95 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       container.style.display = 'block';
     }
 
+    function renderScreenshotHealthPanel(data) {
+      const sh = data.screenshotHealth;
+      const panel = $('screenshotHealthPanel');
+      const badge = $('screenshotHealthBadge');
+      
+      // If no screenshot events at all, hide panel
+      if (data.screenshots.length === 0) {
+        panel.style.display = 'none';
+        badge.style.display = 'none';
+        return;
+      }
+      
+      const hasRisks = sh.blankRiskFactors.length > 0;
+      const hasCritical = sh.blankRiskFactors.some(r => r.severity === 'critical');
+      
+      // Show badge if there are risk factors
+      if (hasRisks) {
+        badge.style.display = 'inline-block';
+        badge.textContent = hasCritical ? '⚠️ Blank Risk' : '⚠️ Check';
+        badge.style.background = hasCritical ? '#e74c3c' : '#f39c12';
+      } else {
+        badge.style.display = 'none';
+      }
+      
+      // Build panel
+      let html = '';
+      
+      // Stats row
+      html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">`;
+      html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;flex:1;min-width:120px;text-align:center;">
+        <div style="font-size:20px;font-weight:600;color:var(--accent);">${sh.captures.length}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Captures</div>
+      </div>`;
+      html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;flex:1;min-width:120px;text-align:center;">
+        <div style="font-size:20px;font-weight:600;color:var(--accent);">${sh.uploads.length}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Uploads</div>
+      </div>`;
+      html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;flex:1;min-width:120px;text-align:center;">
+        <div style="font-size:20px;font-weight:600;color:${sh.failures.length > 0 ? '#e74c3c' : 'var(--success)'};">${sh.failures.length}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Failures</div>
+      </div>`;
+      if (hasRisks) {
+        html += `<div style="background:${hasCritical ? 'rgba(231,76,60,0.1)' : 'rgba(243,156,18,0.1)'};border:1px solid ${hasCritical ? 'rgba(231,76,60,0.3)' : 'rgba(243,156,18,0.3)'};border-radius:8px;padding:8px 14px;flex:1;min-width:120px;text-align:center;">
+          <div style="font-size:20px;font-weight:600;color:${hasCritical ? '#e74c3c' : '#f39c12'};">${sh.blankRiskFactors.length}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Blank Risk Factors</div>
+        </div>`;
+      }
+      html += `</div>`;
+      
+      // Risk factors
+      if (hasRisks) {
+        html += `<div style="background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.25);border-radius:8px;padding:12px;margin-bottom:8px;">`;
+        html += `<div style="font-weight:600;margin-bottom:8px;color:#f39c12;">⚠️ Screenshots May Be Blank or Black</div>`;
+        html += `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">The logs show screenshot uploads occurring, but the following risk factors suggest the actual images may be blank, black, or show only the desktop wallpaper. <strong>Check the Hubstaff dashboard Activity page to verify.</strong></div>`;
+        
+        sh.blankRiskFactors.forEach(rf => {
+          const color = rf.severity === 'critical' ? '#e74c3c' : rf.severity === 'warning' ? '#f39c12' : '#3498db';
+          const icon = rf.severity === 'critical' ? '🔴' : rf.severity === 'warning' ? '🟡' : '🔵';
+          html += `<div style="padding:8px 10px;margin-bottom:6px;background:var(--surface);border-radius:6px;border-left:3px solid ${color};">
+            <div style="font-weight:500;font-size:12px;">${icon} ${escapeHtml(rf.reason)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px;">${rf.detail}</div>
+          </div>`;
+        });
+        
+        // Actionable help
+        html += `<div style="margin-top:10px;padding:8px 10px;background:var(--surface);border-radius:6px;border-left:3px solid var(--accent);">
+          <div style="font-weight:500;font-size:12px;">💡 What to Do</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">
+            <strong>1.</strong> Check the Activity page in Hubstaff dashboard — are the screenshots actually blank?<br>
+            <strong>2.</strong> <strong>macOS:</strong> Ensure screen recording permission is granted: System Settings → Privacy & Security → Screen & System Audio Recording → toggle Hubstaff ON. May require quit & reopen.<br>
+            <strong>3.</strong> <strong>Windows:</strong> Check for web-shield/antivirus software (McAfee, Norton, Webroot) or VirtualBox that may block screen capture.<br>
+            <strong>4.</strong> <strong>Sleep:</strong> If the computer goes to sleep while tracking, screenshots captured at that moment will be black.<br>
+            <strong>5.</strong> Reference: <a href="https://support.hubstaff.com/blank-black-screenshot-images-activity-page/" target="_blank" style="color:var(--accent);">Hubstaff: Blank/Black Screenshots</a> · <a href="https://support.hubstaff.com/how-to-give-hubstaff-screen-capture-permissions-on-macos/" target="_blank" style="color:var(--accent);">macOS Permissions Guide</a>
+          </div>
+        </div>`;
+        
+        html += `</div>`;
+      } else if (data.screenshots.length > 0) {
+        // No risk factors — show success
+        html += `<div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.25);border-radius:8px;padding:10px 12px;">
+          <span style="color:var(--success);font-weight:500;">✅ Screenshots look healthy</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:8px;">${sh.captures.length} captured, ${sh.uploads.length} uploaded, no blank screenshot risk factors detected.</span>
+        </div>`;
+      }
+      
+      panel.innerHTML = html;
+      panel.style.display = 'block';
+    }
+
     function renderLevelTag(level) {
       const cls = level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : level === 'AUDIT' ? 'audit' : level === 'INFO' ? 'info' : level === 'DEBUG' ? 'debug' : 'trace';
       return `<span class="tag ${cls}">${level}</span>`;
@@ -5060,6 +5628,9 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         $('errorsList').innerHTML = '<div class="event-item" style="color:var(--muted)">No errors found</div>';
         $('warningsList').innerHTML = '<div class="event-item" style="color:var(--muted)">No warnings found</div>';
         $('screenshotsBody').innerHTML = '';
+        $('screenshotHealthPanel').style.display = 'none';
+        $('screenshotHealthPanel').innerHTML = '';
+        $('screenshotHealthBadge').style.display = 'none';
         $('networkBody').innerHTML = '';
         $('locationsBody').innerHTML = '';
         $('appsBody').innerHTML = '';
@@ -5308,16 +5879,20 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       }
 
       // Screenshots
-      $('screenshotsBody').innerHTML = data.screenshots.slice(0, 50).map(e => `
+      createVirtualTable('screenshots', 'screenshotsBody', data.screenshots, (e) => `
         <tr>
           <td>${fmtTime(e.ts)}</td>
           <td>${renderLevelTag(e.level)}</td>
           <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
         </tr>
-      `).join('') || '<tr><td colspan="3" style="color:var(--muted)">No screenshot events found</td></tr>';
+      `, 'No screenshot events found');
+
+      // Screenshot Health Panel
+      renderScreenshotHealthPanel(data);
 
       // Network
-      $('networkBody').innerHTML = data.network.slice(0, 50).map(e => {
+      $('networkBody').innerHTML = ''; // cleared before virtual render
+      createVirtualTable('network', 'networkBody', data.network, (e) => {
         let statusCls = 'info';
         if (e.msg.match(/Response:\s*[45]\d{2}/)) statusCls = 'error';
         else if (e.msg.includes('Error')) statusCls = 'error';
@@ -5328,7 +5903,7 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
             <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No network issues found</td></tr>';
+      }, 'No network issues found');
 
       // Locations
       // First render job sites summary if we have site data
@@ -5408,16 +5983,16 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // Render visit history
       renderVisitHistory(data);
       
-      $('locationsBody').innerHTML = data.locations.slice(0, 50).map(e => `
+      createVirtualTable('locations', 'locationsBody', data.locations, (e) => `
         <tr>
           <td>${fmtTime(e.ts)}</td>
           <td>${renderLevelTag(e.level)}</td>
           <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
         </tr>
-      `).join('') || '<tr><td colspan="3" style="color:var(--muted)">No location events found</td></tr>';
+      `, 'No location events found');
 
       // Apps
-$('appsBody').innerHTML = data.apps.slice(0, 100).map(e => {
+const appsRowRenderer = (e) => {
   let type = e.extractedType || 'App';
   let content = '';
   
@@ -5465,7 +6040,8 @@ $('appsBody').innerHTML = data.apps.slice(0, 100).map(e => {
       <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(content)}">${escapeHtml(content)}</td>
     </tr>
   `;
-}).filter(row => row !== '').join('') || '<tr><td colspan="3" style="color:var(--muted)">No app/URL events found</td></tr>';
+};
+createVirtualTable('apps', 'appsBody', data.apps, appsRowRenderer, 'No app/URL events found');
 
 // Update apps count to reflect actual valid entries (excluding empty ones)
 const actualAppsCount = data.apps.filter(e => {
@@ -5476,7 +6052,7 @@ const actualAppsCount = data.apps.filter(e => {
 $('appsCount').textContent = actualAppsCount;
 
       // Injected Input
-      $('injectedBody').innerHTML = data.injected.slice(0, 100).map(e => {
+      createVirtualTable('injected', 'injectedBody', data.injected, (e) => {
         let type = 'Injected';
         let tagClass = 'warn';
         let displayMsg = e.msg;
@@ -5513,10 +6089,10 @@ $('appsCount').textContent = actualAppsCount;
             <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.msg)}">${escapeHtml(displayMsg)}</td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="3" style="color:var(--success)">✓ No injected or simulated input detected</td></tr>';
+      }, '✓ No injected or simulated input detected');
 
       // Tracking
-      $('trackingBody').innerHTML = data.tracking.slice(0, 50).map(e => {
+      createVirtualTable('tracking', 'trackingBody', data.tracking, (e) => {
         let eventType = 'Event';
         if (e.msg.includes('Resume')) eventType = 'Resume';
         else if (e.msg.includes('Idle')) eventType = 'Idle';
@@ -5532,7 +6108,7 @@ $('appsCount').textContent = actualAppsCount;
             <td style="font-size:11px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(e.msg)}</td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="3" style="color:var(--muted)">No tracking events found</td></tr>';
+      }, 'No tracking events found');
 
       // Render timeline
       renderTimeline(data);
@@ -5546,7 +6122,7 @@ $('appsCount').textContent = actualAppsCount;
       }
 
       const q = query.toLowerCase();
-      const results = allLines.filter(line => line.toLowerCase().includes(q)).slice(0, 200);
+      const results = allLines.filter(line => line.toLowerCase().includes(q));
 
       $('searchCount').textContent = results.length;
       
@@ -5558,7 +6134,7 @@ $('appsCount').textContent = actualAppsCount;
         return;
       }
 
-      $('searchBody').innerHTML = results.map(line => {
+      createVirtualTable('search', 'searchBody', results, (line) => {
         const ts = parseTimestamp(line);
         const level = parseLevel(line);
         const src = parseSource(line);
@@ -5572,7 +6148,7 @@ $('appsCount').textContent = actualAppsCount;
             <td style="font-size:11px;">${highlightedMsg}</td>
           </tr>
         `;
-      }).join('');
+      }, 'No results found');
     }
 
     // ========== FILE UPLOAD HANDLING ==========
@@ -5921,6 +6497,12 @@ $('appsCount').textContent = actualAppsCount;
       parsedData = null;
       timelineMin = null;
       timelineDur = null;
+      // Cleanup virtual scroll listeners
+      Object.keys(virtualTableInstances).forEach(k => {
+        const inst = virtualTableInstances[k];
+        if (inst.scrollHandler) inst.wrap.removeEventListener('scroll', inst.scrollHandler);
+        delete virtualTableInstances[k];
+      });
       render(null);
       $('timelineSection').style.display = 'none';
       $('filterStats').style.display = 'none';
