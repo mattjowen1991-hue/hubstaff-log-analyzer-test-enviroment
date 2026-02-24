@@ -114,6 +114,10 @@
         warnings: [],
         screenshots: [],
         network: [],
+        networkBlocks: {       // Aggregated network block analysis
+          failedUrls: [],      // {ts, url, errorType, detail}
+          blockedDomains: {},  // { domain: { count, endpoints: Set, errorTypes: Set, firstSeen, lastSeen } }
+        },
         locations: [],
         apps: [],
         tracking: [],
@@ -152,9 +156,13 @@
           autoStartStops: [],    // {ts, type: 'START'|'STOP'|'NO_ACTIVITY', detail}
           doubleStarts: [],      // {ts} - START without prior STOP
           // Phase 4
-          sslErrors: [],         // {ts, msg}
+          sslErrors: [],         // {ts, msg, url, domain}
           http429s: [],          // {ts, msg}
-          pendingDetected: []    // {ts}
+          pendingDetected: [],   // {ts}
+          networkBlocks: {       // Aggregated network block analysis
+            failedUrls: [],      // {ts, url, errorType, detail}
+            blockedDomains: {},  // { domain: { count, endpoints: Set, errorTypes: Set, firstSeen, lastSeen } }
+          }
         },
         // Screenshot Health Analysis
         screenshotHealth: {
@@ -375,6 +383,37 @@ if (!showTrace && level === 'TRACE') continue;
           data.network.push(entry);
         }
 
+        // Network block URL extraction (works for all log types)
+        var urlTagMatch2 = line.match(/\[Exception::tag_http_request_url\*\]\s*=\s*(https?:\/\/[^\s\r\n]+)/);
+        if (urlTagMatch2) {
+          var url2 = urlTagMatch2[1].trim();
+          try {
+            var hostname2 = new URL(url2).hostname;
+            var endpoint2 = new URL(url2).pathname.replace(/\/[a-f0-9]{20,}[^\s\/]*/g, '/*').replace(/\/\d{4}\/\d{2}\/\d+\/[^\/]+\/[^\/]+$/, '/…');
+            var errorType2 = 'network';
+            if (line.includes('SSL') || line.includes('ssl')) errorType2 = 'ssl';
+            else if (line.includes('Timeout') || line.includes('timeout')) errorType2 = 'timeout';
+            data.networkBlocks.failedUrls.push({ ts, url: url2, errorType: errorType2, domain: hostname2, endpoint: endpoint2 });
+            if (!data.networkBlocks.blockedDomains[hostname2]) {
+              data.networkBlocks.blockedDomains[hostname2] = { count: 0, endpoints: new Set(), errorTypes: new Set(), firstSeen: ts, lastSeen: ts };
+            }
+            var dom2 = data.networkBlocks.blockedDomains[hostname2];
+            dom2.count++;
+            dom2.endpoints.add(endpoint2);
+            dom2.errorTypes.add(errorType2);
+            if (ts) dom2.lastSeen = ts;
+          } catch(e) {}
+        }
+        var connMatch2 = line.match(/connection to ([a-zA-Z0-9._-]+\.(?:com|net|org|io|amazonaws\.com)):(\d+)/);
+        if (connMatch2) {
+          var hostname3 = connMatch2[1];
+          if (!data.networkBlocks.blockedDomains[hostname3]) {
+            data.networkBlocks.blockedDomains[hostname3] = { count: 0, endpoints: new Set(), errorTypes: new Set(), firstSeen: ts, lastSeen: ts };
+          }
+          data.networkBlocks.blockedDomains[hostname3].count++;
+          data.networkBlocks.blockedDomains[hostname3].errorTypes.add('ssl');
+        }
+
         // Locations (expanded for iOS/Android location issues)
         if (line.includes('feed: sites') || line.includes('LocationFeatureState') || line.includes('LocationManager') || line.includes('geofence') || line.includes('Geofence') || line.includes('Job Site') || line.includes('[Site]') || line.includes('[Position]') || line.includes('[LocationRequest]') || line.includes('[LocationResolution]') || line.includes('primary device') || line.includes('Primary changed') || (line.toLowerCase().includes('location') && (line.includes('permission') || line.includes('unavailable') || line.includes('denied')))) {
           data.locations.push(entry);
@@ -564,8 +603,10 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
       // === SILENT APP DETECTION ===
       // Scan all lines for silent app / corporate indicators
       const sa = data.silentApp;
+      let lastSaTs = null;
       for (const line of lines) {
         const ts = parseTimestamp(line);
+        if (ts) lastSaTs = ts;
 
         // Detect corporate/enterprise app (silent app indicator)
         if (line.includes('ENTERPRISE_INSTALL') || line.includes('enterprise.profile') || line.includes('Corporate')) {
@@ -734,7 +775,7 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
           sa.pendingDetected.push({ ts });
         }
 
-        // Phase 4: SSL errors
+        // Phase 4: SSL errors + URL extraction
         if (line.includes('SSL') && (line.includes('error') || line.includes('Error') || line.includes('timeout'))) {
           sa.sslErrors.push({ ts, msg: line.substring(0, 200).trim() });
         }
@@ -743,6 +784,59 @@ else if (line.match(/^\s*name\s+["']?(.+?)["']?\s*$/)) {
         if (line.includes('Response: 429') || line.includes('Too Many Requests')) {
           sa.http429s.push({ ts, msg: line.substring(0, 200).trim() });
         }
+
+        // Phase 4: Network block URL extraction
+        // Capture failed request URLs from tag_http_request_url
+        const urlTagMatch = line.match(/\[Exception::tag_http_request_url\*\]\s*=\s*(https?:\/\/[^\s\r\n]+)/);
+        if (urlTagMatch) {
+          const url = urlTagMatch[1].trim();
+          try {
+            const hostname = new URL(url).hostname;
+            const endpoint = new URL(url).pathname.replace(/\/[a-f0-9]{20,}[^\s\/]*/g, '/*').replace(/\/\d{4}\/\d{2}\/\d+\/[^\/]+\/[^\/]+$/, '/…');
+            // Determine error type from surrounding context
+            let errorType = 'network';
+            if (line.includes('SSL') || line.includes('ssl')) errorType = 'ssl';
+            else if (line.includes('Timeout') || line.includes('timeout')) errorType = 'timeout';
+
+            sa.networkBlocks.failedUrls.push({ ts: ts || lastSaTs, url, errorType, domain: hostname, endpoint });
+            
+            if (!sa.networkBlocks.blockedDomains[hostname]) {
+              sa.networkBlocks.blockedDomains[hostname] = { count: 0, endpoints: new Set(), errorTypes: new Set(), firstSeen: ts || lastSaTs, lastSeen: ts || lastSaTs };
+            }
+            const dom = sa.networkBlocks.blockedDomains[hostname];
+            dom.count++;
+            dom.endpoints.add(endpoint);
+            dom.errorTypes.add(errorType);
+            if (ts) dom.lastSeen = ts;
+          } catch(e) { /* invalid URL */ }
+        }
+
+        // Capture "connection to domain:port" from SSL error details
+        const connMatch = line.match(/connection to ([a-zA-Z0-9._-]+\.(?:com|net|org|io|amazonaws\.com)):(\d+)/);
+        if (connMatch) {
+          const hostname = connMatch[1];
+          if (!sa.networkBlocks.blockedDomains[hostname]) {
+            sa.networkBlocks.blockedDomains[hostname] = { count: 0, endpoints: new Set(), errorTypes: new Set(), firstSeen: ts || lastSaTs, lastSeen: ts || lastSaTs };
+          }
+          const dom = sa.networkBlocks.blockedDomains[hostname];
+          dom.count++;
+          dom.errorTypes.add('ssl');
+          if (ts) dom.lastSeen = ts;
+        }
+
+        // Capture "Network Error uploading X" as network failures
+        const uploadErrMatch = line.match(/Network Error uploading (\w+)/);
+        if (uploadErrMatch) {
+          sa.networkBlocks.failedUrls.push({ ts, url: null, errorType: 'upload_fail', domain: 'client-api.hubstaff.com', endpoint: uploadErrMatch[1] });
+          if (!sa.networkBlocks.blockedDomains['client-api.hubstaff.com']) {
+            sa.networkBlocks.blockedDomains['client-api.hubstaff.com'] = { count: 0, endpoints: new Set(), errorTypes: new Set(), firstSeen: ts, lastSeen: ts };
+          }
+          sa.networkBlocks.blockedDomains['client-api.hubstaff.com'].count++;
+          sa.networkBlocks.blockedDomains['client-api.hubstaff.com'].errorTypes.add('upload_fail');
+        }
+
+        // Track last timestamp for continuation lines
+        // (lastSaTs updated at top of loop)
       }
 
       // Phase 3: Detect double-starts (START_TRACKING without preceding STOP_TRACKING)

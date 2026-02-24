@@ -783,6 +783,80 @@
             </div>
           ` : ''}
 
+          ${Object.keys(sa.networkBlocks.blockedDomains).length > 0 ? (() => {
+            const domains = sa.networkBlocks.blockedDomains;
+            const domainList = Object.entries(domains).sort((a, b) => b[1].count - a[1].count);
+            const totalFailures = sa.networkBlocks.failedUrls.length;
+            const hasSSL = domainList.some(([,d]) => d.errorTypes.has('ssl'));
+            const hasTimeout = domainList.some(([,d]) => d.errorTypes.has('timeout'));
+            
+            const hubstaffDomains = [
+              { domain: 'client-api.hubstaff.com', desc: 'Main API — activity sync, screenshots, config' },
+              { domain: 'api.hubstaff.com', desc: 'API gateway' },
+              { domain: 'hubstaff.com', desc: 'Main website & auth' },
+              { domain: 'account.hubstaff.com', desc: 'Account management' },
+              { domain: '*.amazonaws.com', desc: 'Screenshot storage (S3)' },
+            ];
+
+            return `
+            <div style="margin-top:16px; border-top:1px dashed var(--border); padding-top:14px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="font-size:13px; font-weight:700; color:var(--danger);">🚫 Network Block Analysis</div>
+                <span class="tag error" style="font-size:10px;">${totalFailures} failed requests across ${domainList.length} domain${domainList.length > 1 ? 's' : ''}</span>
+              </div>
+              
+              <div style="padding:12px; background:rgba(239,68,68,0.05); border:1px solid var(--danger); border-radius:8px; margin-bottom:12px;">
+                <div style="font-size:12px; font-weight:600; color:var(--danger); margin-bottom:8px;">⚠️ Blocked Domains Detected</div>
+                <div style="font-size:11px; color:var(--text); margin-bottom:8px;">
+                  The following Hubstaff domains are failing with ${hasSSL ? 'SSL/TLS errors' : ''}${hasSSL && hasTimeout ? ' and ' : ''}${hasTimeout ? 'connection timeouts' : ''}. 
+                  This prevents the app from syncing tracked data, uploading screenshots, and refreshing configuration.
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                  ${domainList.map(([domain, info]) => {
+                    const errorBadges = [...info.errorTypes].map(t => {
+                      if (t === 'ssl') return '<span class="tag error" style="font-size:9px;">SSL</span>';
+                      if (t === 'timeout') return '<span class="tag warn" style="font-size:9px;">TIMEOUT</span>';
+                      if (t === 'upload_fail') return '<span class="tag error" style="font-size:9px;">UPLOAD FAIL</span>';
+                      return '<span class="tag info" style="font-size:9px;">' + t.toUpperCase() + '</span>';
+                    }).join(' ');
+                    const endpoints = [...info.endpoints].slice(0, 5);
+                    return '<div style="padding:8px 10px; background:var(--panel); border:1px solid var(--border); border-radius:6px; font-size:11px;">' +
+                      '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
+                        '<strong style="color:var(--text); font-family:monospace;">' + escapeHtml(domain) + '</strong>' +
+                        errorBadges +
+                        '<span style="color:var(--muted);">' + info.count + ' failures</span>' +
+                      '</div>' +
+                      (endpoints.length > 0 ? '<div style="margin-top:4px; color:var(--muted); font-size:10px; font-family:monospace;">' +
+                        'Endpoints: ' + endpoints.map(e => escapeHtml(e)).join(', ') +
+                      '</div>' : '') +
+                    '</div>';
+                  }).join('')}
+                </div>
+              </div>
+
+              <div style="padding:12px; background:rgba(124,58,237,0.05); border:1px solid var(--accent); border-radius:8px;">
+                <div style="font-size:12px; font-weight:600; color:var(--accent); margin-bottom:8px;">💡 Next Steps — Share with the customer</div>
+                <div style="font-size:11px; color:var(--text); line-height:1.6;">
+                  <p style="margin:0 0 8px;">Ask the customer (or their IT admin) to <strong>allow outbound HTTPS connections</strong> and <strong>bypass SSL/TLS inspection</strong> for the following domains:</p>
+                  <div style="background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-family:monospace; font-size:11px; margin-bottom:8px;">
+                    ${hubstaffDomains.map(d => 
+                      '<div style="display:flex; justify-content:space-between; padding:2px 0;">' +
+                        '<span style="color:var(--link);">' + d.domain + '</span>' +
+                        '<span style="color:var(--muted); font-family:system-ui; font-size:10px;">' + d.desc + '</span>' +
+                      '</div>'
+                    ).join('')}
+                  </div>
+                  <p style="margin:0 0 6px;">Connections must be allowed over <strong>TCP port 443</strong> without:</p>
+                  <ul style="margin:0; padding-left:16px; color:var(--muted);">
+                    <li>SSL inspection</li>
+                    <li>Proxy rewriting</li>
+                    <li>Certificate substitution</li>
+                  </ul>
+                </div>
+              </div>
+            </div>`;
+          })() : ''}
+
           ${health.multiDayGaps.length > 0 ? `
             <div style="margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
               <div style="font-size:12px; font-weight:700; color:var(--danger); margin-bottom:8px;">🚨 Extended Offline Periods</div>

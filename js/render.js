@@ -422,6 +422,57 @@
         `;
       }, 'No network issues found');
 
+      // Network Block Analysis (if blocked domains detected)
+      const nb = data.networkBlocks;
+      const nbDomains = Object.keys(nb.blockedDomains);
+      const nbPanel = document.getElementById('networkBlockAnalysis');
+      if (nbDomains.length > 0 && nbPanel) {
+        const domainList = Object.entries(nb.blockedDomains).sort((a, b) => b[1].count - a[1].count);
+        const hasSSL = domainList.some(([,d]) => d.errorTypes.has('ssl'));
+        const hasTimeout = domainList.some(([,d]) => d.errorTypes.has('timeout'));
+        
+        const hubstaffDomains = [
+          { domain: 'client-api.hubstaff.com', desc: 'Main API — activity sync, screenshots, config' },
+          { domain: 'api.hubstaff.com', desc: 'API gateway' },
+          { domain: 'hubstaff.com', desc: 'Main website & auth' },
+          { domain: 'account.hubstaff.com', desc: 'Account management' },
+          { domain: '*.amazonaws.com', desc: 'Screenshot storage (S3)' },
+        ];
+
+        nbPanel.innerHTML = `
+          <div style="font-size:13px; font-weight:700; color:var(--danger); margin-bottom:10px;">🚫 Network Block Analysis</div>
+          <div style="padding:12px; background:rgba(239,68,68,0.05); border:1px solid var(--danger); border-radius:8px; margin-bottom:12px;">
+            <div style="font-size:12px; font-weight:600; color:var(--danger); margin-bottom:8px;">⚠️ ${nb.failedUrls.length} failed requests across ${domainList.length} domain${domainList.length > 1 ? 's' : ''}</div>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              ${domainList.map(([domain, info]) => {
+                const errorBadges = [...info.errorTypes].map(t => {
+                  if (t === 'ssl') return '<span class="tag error" style="font-size:9px;">SSL</span>';
+                  if (t === 'timeout') return '<span class="tag warn" style="font-size:9px;">TIMEOUT</span>';
+                  if (t === 'upload_fail') return '<span class="tag error" style="font-size:9px;">UPLOAD FAIL</span>';
+                  return '<span class="tag info" style="font-size:9px;">' + t.toUpperCase() + '</span>';
+                }).join(' ');
+                return '<div style="padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:6px; font-size:11px;">' +
+                  '<strong style="font-family:monospace;">' + escapeHtml(domain) + '</strong> ' + errorBadges +
+                  ' <span style="color:var(--muted);">' + info.count + ' failures</span></div>';
+              }).join('')}
+            </div>
+          </div>
+          <div style="padding:12px; background:rgba(124,58,237,0.05); border:1px solid var(--accent); border-radius:8px;">
+            <div style="font-size:12px; font-weight:600; color:var(--accent); margin-bottom:6px;">💡 Next Steps</div>
+            <div style="font-size:11px; line-height:1.6;">
+              <p style="margin:0 0 6px;">Ask the customer to allow outbound HTTPS and bypass SSL/TLS inspection for:</p>
+              <div style="background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-family:monospace; font-size:11px; margin-bottom:6px;">
+                ${hubstaffDomains.map(d => '<div><span style="color:var(--link);">' + d.domain + '</span></div>').join('')}
+              </div>
+              <p style="margin:0; color:var(--muted);">Over TCP port 443, without SSL inspection, proxy rewriting, or certificate substitution.</p>
+            </div>
+          </div>
+        `;
+        nbPanel.style.display = 'block';
+      } else if (nbPanel) {
+        nbPanel.style.display = 'none';
+      }
+
       // Locations
       // First render job sites summary if we have site data
       let locationsPreamble = '';
