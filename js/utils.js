@@ -382,9 +382,11 @@
     }
 
     function parseTimestamp(line) {
-      const m = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+      const m = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.\d+)?([+-]\d{2}:?\d{2}|Z)?/);
       if (!m) return null;
-      return new Date(`${m[1]}T${m[2]}`);
+      let tz = m[3] ? m[3].trim() : null;
+      if (tz && tz !== 'Z' && !tz.includes(':')) tz = tz.slice(0, 3) + ':' + tz.slice(3);
+      return tz ? new Date(`${m[1]}T${m[2]}.000${tz}`) : new Date(`${m[1]}T${m[2]}`);
     }
 
     function parseTimezone(line) {

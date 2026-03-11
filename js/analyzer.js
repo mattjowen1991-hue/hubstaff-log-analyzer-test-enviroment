@@ -207,6 +207,8 @@
           const tz = parseTimezone(line);
           if (tz) {
             data.timezone = tz;
+            // Check if offset is negative (misconfigured timezone)
+            data.timezoneNegative = tz.startsWith('-');
             // Auto-fill timezone input if empty
             if (!$('tzOffset').value) {
               $('tzOffset').value = tz;

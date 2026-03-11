@@ -140,9 +140,26 @@
       $('kpiTimezone').textContent = data.timezone || 'Unknown';
       $('kpiTimezone').style.fontSize = data.timezone ? '18px' : '14px';
 
+      // Timezone banner
+      const existingTzBanner = $('tzWarningBanner');
+      if (existingTzBanner) existingTzBanner.remove();
+      if (data.timezoneNegative) {
+        const banner = document.createElement('div');
+        banner.id = 'tzWarningBanner';
+        banner.style.cssText = 'background:rgba(239,68,68,0.12); border:1px solid #ef4444; border-radius:8px; padding:12px 16px; margin-bottom:12px; color:#fca5a5; font-size:13px;';
+        banner.innerHTML = '⚠️ <strong>Negative timezone offset detected (' + data.timezone + ')</strong> — This usually means the user has set their Hubstaff timezone to their employer\'s timezone instead of their own local timezone. Times in this log may be recorded incorrectly. Ask the user to update their timezone in <strong>Hubstaff Profile &gt; Edit account</strong> and sync their system clock to match their actual local timezone.';
+        $('summaryCard').parentNode.insertBefore(banner, $('summaryCard'));
+      } else if (!data.timezone) {
+        const banner = document.createElement('div');
+        banner.id = 'tzWarningBanner';
+        banner.style.cssText = 'background:rgba(245,158,11,0.12); border:1px solid #f59e0b; border-radius:8px; padding:12px 16px; margin-bottom:12px; color:#fcd34d; font-size:13px;';
+        banner.innerHTML = '⚠️ <strong>No timezone offset detected in these logs.</strong> Times are displayed as recorded, but if the user\'s system clock is misconfigured, tracked times may not reflect their actual local time. Check <code>helper_info.*</code> files for a <code>TZ Offset</code> line if available.';
+        $('summaryCard').parentNode.insertBefore(banner, $('summaryCard'));
+      }
+
       // Update badge counts
       $('errorsCount').textContent = data.errors.length;
-      $('warningsCount').textContent = data.warnings.length;
+      $('warningsCount').textContent = data.warnings.length; // updated below after allWarnings is built
       $('screenshotsCount').textContent = data.screenshots.length;
       $('networkCount').textContent = data.network.length;
       $('locationsCount').textContent = data.locations.length;
@@ -153,7 +170,7 @@
 
       // Update badge colors based on counts
       $('errorsCount').className = 'badge ' + (data.errors.length > 0 ? 'danger' : '');
-      $('warningsCount').className = 'badge ' + (data.warnings.length > 0 ? 'warn' : '');
+      // warningsCount text and class updated below after allWarnings is built
       $('networkCount').className = 'badge ' + (data.network.length > 0 ? 'warn' : '');
       $('injectedCount').className = 'badge ' + (data.injected.length > 0 ? 'warn' : '');
 
@@ -379,8 +396,24 @@
       }
 
       // Warnings
-      if (data.warnings.length) {
-        $('warningsList').innerHTML = data.warnings.slice(0, 100).map(e => {
+      // Prepend timezone warning into warnings list if needed
+      const tzWarnings = [];
+      if (data.timezoneNegative) {
+        tzWarnings.push({ level: 'WARN', message: `⚠️ Negative timezone offset (${data.timezone}) — user's Hubstaff timezone is likely set to their employer's timezone, not their own. This causes incorrect time recording. Fix: Hubstaff Profile > Edit account > update timezone.` });
+      } else if (!data.timezone) {
+        tzWarnings.push({ level: 'WARN', message: '⚠️ No timezone offset found in logs — times are shown as recorded but may not reflect the user\'s actual local time.' });
+      }
+      const allWarnings = [...tzWarnings, ...data.warnings];
+
+      $('warningsCount').textContent = allWarnings.length;
+      $('warningsCount').className = 'badge ' + (allWarnings.length > 0 ? 'warn' : '');
+
+      if (allWarnings.length) {
+        $('warningsList').innerHTML = allWarnings.slice(0, 100).map(e => {
+          if (e.message) {
+            // Injected timezone warning — simplified render
+            return `<div class="event-item"><div class="event-detail">${e.message}</div></div>`;
+          }
           const translation = plainMode ? translateToPlainEnglish(e.msg, e.level, e.src) : null;
           return `
             <div class="event-item">
