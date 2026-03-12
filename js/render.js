@@ -95,6 +95,8 @@
     function render(data) {
       const plainMode = $('plainMode').checked;
       
+      const existingTzBanner = $('tzWarningBanner');
+      if (existingTzBanner) existingTzBanner.remove();
       if (!data) {
         $('kpiTotal').textContent = '0';
         $('kpiErrors').textContent = '0';
@@ -141,8 +143,6 @@
       $('kpiTimezone').style.fontSize = data.timezone ? '18px' : '14px';
 
       // Timezone banner
-      const existingTzBanner = $('tzWarningBanner');
-      if (existingTzBanner) existingTzBanner.remove();
       if (data.timezoneNegative) {
         const banner = document.createElement('div');
         banner.id = 'tzWarningBanner';
